@@ -54,7 +54,13 @@ public sealed class ProgressScope(IProgress<ToolProgress>? progress, double from
     /// <summary>A scope covering the part [a, b] of this scope.</summary>
     public ProgressScope Slice(double a, double b) => new(progress, from + (to - from) * a, from + (to - from) * b);
 
-    public IProgress<ToolProgress>? Inner => progress;
+    /// <summary>An <see cref="IProgress{T}"/> whose 0..1 range maps onto this scope, for nested operations.</summary>
+    public IProgress<ToolProgress> AsProgress() => new Mapped(this);
+
+    private sealed class Mapped(ProgressScope scope) : IProgress<ToolProgress>
+    {
+        public void Report(ToolProgress value) => scope.Report(value.Fraction, value.Status);
+    }
 }
 
 /// <summary>Raised when a document cannot be opened without a (correct) password.</summary>
