@@ -4,29 +4,79 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Title="PageSmith"
-    Width="1200"
-    Height="800"
-    MinWidth="900"
-    MinHeight="600"
+    Width="1360"
+    Height="880"
+    MinWidth="1000"
+    MinHeight="640"
     ExtendsContentIntoTitleBar="True"
     WindowBackdropType="Mica"
     WindowCornerPreference="Round"
     WindowStartupLocation="CenterScreen">
-    <Grid>
+    <Grid x:Name="Root">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <ui:TitleBar Title="PageSmith" Grid.Row="0">
+
+        <ui:TitleBar
+            x:Name="TitleBar"
+            Title="PageSmith"
+            Grid.Row="0"
+            CloseWindowByDoubleClickOnIcon="True">
             <ui:TitleBar.Icon>
                 <ui:ImageIcon Source="pack://application:,,,/Assets/PageSmith-64.png" />
             </ui:TitleBar.Icon>
+            <ui:TitleBar.TrailingContent>
+                <Button
+                    x:Name="NetworkChip"
+                    Margin="0,0,8,0"
+                    Padding="10,4"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Click="OnNetworkChipClick"
+                    Cursor="Hand"
+                    ToolTip="Internet status. Most tools work offline.">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon x:Name="NetworkIcon" FontSize="14" Symbol="Wifi124" />
+                        <TextBlock
+                            x:Name="NetworkText"
+                            Margin="6,0,0,0"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            Text="Checking…" />
+                    </StackPanel>
+                </Button>
+            </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
-        <TextBlock
+
+        <ui:NavigationView
+            x:Name="Nav"
             Grid.Row="1"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            FontSize="24"
-            Text="PageSmith" />
+            FrameMargin="0"
+            IsBackButtonVisible="Visible"
+            IsPaneToggleVisible="True"
+            OpenPaneLength="280"
+            PaneDisplayMode="Left"
+            TitleBar="{Binding ElementName=TitleBar, Mode=OneWay}"
+            Transition="FadeInWithSlide">
+            <ui:NavigationView.AutoSuggestBox>
+                <ui:AutoSuggestBox x:Name="SearchBox" PlaceholderText="Search tools">
+                    <ui:AutoSuggestBox.Icon>
+                        <ui:IconSourceElement>
+                            <ui:SymbolIconSource Symbol="Search24" />
+                        </ui:IconSourceElement>
+                    </ui:AutoSuggestBox.Icon>
+                </ui:AutoSuggestBox>
+            </ui:NavigationView.AutoSuggestBox>
+            <ui:NavigationView.ContentOverlay>
+                <Grid>
+                    <ui:SnackbarPresenter x:Name="Snackbars" />
+                </Grid>
+            </ui:NavigationView.ContentOverlay>
+        </ui:NavigationView>
+
+        <ui:ContentDialogHost x:Name="DialogHost" Grid.Row="0" Grid.RowSpan="2" />
     </Grid>
 </ui:FluentWindow>
