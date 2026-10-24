@@ -8,7 +8,11 @@ using PigDocument = UglyToad.PdfPig.PdfDocument;
 namespace PageSmith.Core.Text;
 
 /// <summary>A word with its bounds in display space (see <see cref="PageGeometry"/>).</summary>
-public sealed record TextWord(string Text, Rect Bounds, double FontSize, string FontName, bool Bold, bool Italic, uint Rgb);
+public sealed record TextWord(string Text, Rect Bounds, double FontSize, string FontName, bool Bold, bool Italic, uint Rgb)
+{
+    /// <summary>Display-space y of the text baseline, or NaN when unknown (e.g. OCR words).</summary>
+    public double Baseline { get; init; } = double.NaN;
+}
 
 public sealed record TextLineInfo(string Text, Rect Bounds, IReadOnlyList<TextWord> Words)
 {
@@ -103,11 +107,15 @@ public static class TextExtractor
     public static IReadOnlyList<TextLineInfo> GetLines(IReadOnlyList<TextWord> words)
     {
         var lines = new List<List<TextWord>>();
-        foreach (var w in words.OrderBy(w => w.Bounds.Bottom).ThenBy(w => w.Bounds.Left))
+        static double Key(TextWord w) => double.IsNaN(w.Baseline) ? w.Bounds.Bottom : w.Baseline;
+        foreach (var w in words.OrderBy(Key).ThenBy(w => w.Bounds.Left))
         {
             var target = lines.LastOrDefault(l =>
             {
                 var last = l[^1];
+                // Same baseline means same line, even when glyph boxes differ (underscores, sub/superscripts).
+                if (!double.IsNaN(last.Baseline) && !double.IsNaN(w.Baseline))
+                    return Math.Abs(last.Baseline - w.Baseline) <= Math.Max(1.5, 0.3 * Math.Min(last.FontSize, w.FontSize));
                 var overlap = Math.Min(last.Bounds.Bottom, w.Bounds.Bottom) - Math.Max(last.Bounds.Top, w.Bounds.Top);
                 return overlap > 0.5 * Math.Min(last.Bounds.Height, w.Bounds.Height);
             });
@@ -224,7 +232,11 @@ public static class TextExtractor
         {
             rgb = 0;
         }
-        return new TextWord(w.Text, display, size, CleanFontName(fontName), bold, italic, rgb);
+        // Baselines only order lines when text runs horizontally on screen.
+        var baseline = letter != null && geometry.Rotation is 0 or 180 && letter.TextOrientation == TextOrientation.Horizontal
+            ? geometry.ToDisplay(new Point(letter.StartBaseLine.X, letter.StartBaseLine.Y)).Y
+            : double.NaN;
+        return new TextWord(w.Text, display, size, CleanFontName(fontName), bold, italic, rgb) { Baseline = baseline };
     }
 
     /// <summary>Strips the subset prefix ("ABCDEF+Arial-Bold" → "Arial-Bold").</summary>

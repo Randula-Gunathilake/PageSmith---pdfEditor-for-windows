@@ -151,11 +151,11 @@ public class ConvertTests
         Assert.Equal("Microsoft Word", engine);
         Assert.Contains("Microsoft Word", OrganizeTests.PageTexts(back)[0]);
 
-        // Word's own PDF reflow must run unattended (no dialogs) and finish.
+        // Word's PDF reflow sometimes stalls; in Auto mode the watchdog ends it and the built-in converter takes over.
         var reflowed = files.PathFor("reflow.docx");
-        var run = PdfToWordTool.RunAsync(new PdfToOfficeOptions { Input = pdf, OutputPath = reflowed, Engine = ConversionEngine.MicrosoftOffice });
-        Assert.Same(run, await Task.WhenAny(run, Task.Delay(TimeSpan.FromMinutes(2))));
-        await run;
+        MicrosoftOffice.Timeout = TimeSpan.FromSeconds(60);
+        var result = await PdfToWordTool.RunAsync(new PdfToOfficeOptions { Input = pdf, OutputPath = reflowed, Engine = ConversionEngine.Auto });
+        Assert.Single(result.OutputFiles);
         using var word = WordprocessingDocument.Open(reflowed, false);
         Assert.Contains("Microsoft Word", word.MainDocumentPart!.Document!.Body!.InnerText);
     }

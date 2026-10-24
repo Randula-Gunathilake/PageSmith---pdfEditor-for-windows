@@ -1,18 +1,22 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace PageSmith.Core.Office;
 
 /// <summary>
 /// Converts documents by automating the Microsoft Office apps installed on the PC (late-bound COM).
-/// Each call starts the app invisibly, converts, and closes only what it opened.
+/// Each call starts the app invisibly, converts, and closes only what it opened. A watchdog ends the
+/// Office process it started if the conversion hangs (for example on an unexpected dialog).
 /// </summary>
 public static class MicrosoftOffice
 {
     // Passing a password that cannot be right makes Office fail fast on protected files instead of prompting.
     private const string NoPassword = "\u0001pagesmith";
 
+    public static TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(3);
+
     public static Task ToPdfAsync(string input, string output, OfficeApp app, string? password = null, CancellationToken ct = default) =>
-        StaRunner.RunAsync(() =>
+        RunGuardedAsync(app, () =>
         {
             switch (app)
             {
@@ -30,7 +34,7 @@ public static class MicrosoftOffice
 
     /// <summary>Opens a PDF in Word (PDF Reflow) and saves it as DOCX.</summary>
     public static Task PdfToDocxAsync(string inputPdf, string outputDocx, CancellationToken ct = default) =>
-        StaRunner.RunAsync(() =>
+        RunGuardedAsync(OfficeApp.Word, () =>
         {
             dynamic? word = null;
             dynamic? doc = null;
@@ -48,6 +52,34 @@ public static class MicrosoftOffice
                 CloseWord(word, doc);
             }
         }, ct);
+
+    /// <summary>
+    /// Runs Office automation on an STA thread. If it does not finish in time (or is cancelled), the Office
+    /// processes started during the call are ended and a <see cref="TimeoutException"/> is thrown.
+    /// Processes that were already running (the user's own windows) are never touched.
+    /// </summary>
+    private static async Task RunGuardedAsync(OfficeApp app, Action work, CancellationToken ct)
+    {
+        var exe = app switch { OfficeApp.Word => "WINWORD", OfficeApp.Excel => "EXCEL", _ => "POWERPNT" };
+        var before = Process.GetProcessesByName(exe).Select(p => p.Id).ToHashSet();
+        var task = StaRunner.RunAsync(work);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(Timeout);
+        try
+        {
+            await task.WaitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!task.IsCompleted)
+        {
+            foreach (var p in Process.GetProcessesByName(exe))
+            {
+                if (before.Contains(p.Id)) continue;
+                try { p.Kill(); } catch { /* already gone */ }
+            }
+            ct.ThrowIfCancellationRequested();
+            throw new TimeoutException($"Microsoft {app} did not finish within {Timeout.TotalMinutes:0} minutes.");
+        }
+    }
 
     private static void WordToPdf(string input, string output, string? password)
     {
