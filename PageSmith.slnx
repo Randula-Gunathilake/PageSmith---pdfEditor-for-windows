@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PageSmith.App/PageSmith.App.csproj" />
+    <Project Path="src/PageSmith.Core/PageSmith.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PageSmith.Tests/PageSmith.Tests.csproj" />
+  </Folder>
+</Solution>

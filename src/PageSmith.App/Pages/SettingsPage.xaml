@@ -1,0 +1,243 @@
+<Page
+    x:Class="PageSmith.App.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:pages="clr-namespace:PageSmith.App.Pages"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="Settings">
+    <Page.DataContext>
+        <pages:SettingsViewModel />
+    </Page.DataContext>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="980" Margin="36,28,36,36">
+            <ui:TextBlock FontTypography="Title" Text="Settings" />
+
+            <!--  Appearance  -->
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Appearance" />
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="Color24" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="App theme" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="Follows Windows by default." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ComboBox
+                    MinWidth="180"
+                    SelectedValue="{Binding Theme}"
+                    SelectedValuePath="Tag">
+                    <ComboBoxItem Content="Use Windows setting" Tag="System" />
+                    <ComboBoxItem Content="Light" Tag="Light" />
+                    <ComboBoxItem Content="Dark" Tag="Dark" />
+                </ComboBox>
+            </ui:CardControl>
+
+            <!--  Saving  -->
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Saving results" />
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="Folder24" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Where to save" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="{Binding OutputFolder}" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <ComboBox
+                        MinWidth="220"
+                        SelectedValue="{Binding Output}"
+                        SelectedValuePath="Tag">
+                        <ComboBoxItem Content="Next to the original file" Tag="SameFolder" />
+                        <ComboBoxItem Content="In a fixed folder" Tag="Folder" />
+                        <ComboBoxItem Content="Ask every time" Tag="Ask" />
+                    </ComboBox>
+                    <ui:Button
+                        Margin="8,0,0,0"
+                        Command="{Binding BrowseOutputFolderCommand}"
+                        Content="Choose folder…" />
+                </StackPanel>
+            </ui:CardControl>
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="FolderOpen24" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <TextBlock FontWeight="SemiBold" Text="Open the folder in File Explorer after saving" />
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch IsChecked="{Binding OpenFolderAfterSaving}" />
+            </ui:CardControl>
+
+            <!--  Conversion  -->
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Conversion" />
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="DocumentText24" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Office to PDF engine" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="{Binding OfficeStatus}" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ComboBox
+                    MinWidth="220"
+                    SelectedValue="{Binding OfficeEngine}"
+                    SelectedValuePath="Tag">
+                    <ComboBoxItem Content="Automatic" Tag="Auto" />
+                    <ComboBoxItem Content="Microsoft Office" Tag="MicrosoftOffice" />
+                    <ComboBoxItem Content="LibreOffice" Tag="LibreOffice" />
+                    <ComboBoxItem Content="Built-in" Tag="BuiltIn" />
+                </ComboBox>
+            </ui:CardControl>
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="DocumentEdit24" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Use Microsoft Word for PDF to Word" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="Word's reflow can be closer for complex layouts but is slower; PageSmith falls back to its own converter if Word stalls." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch IsChecked="{Binding UseWordForPdfToWord}" />
+            </ui:CardControl>
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="ScanText24" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="OCR language" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="Languages come from Windows. Add more under Time &amp; language." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <ComboBox
+                        MinWidth="200"
+                        DisplayMemberPath="DisplayName"
+                        ItemsSource="{Binding OcrLanguages}"
+                        SelectedItem="{Binding OcrLanguage}" />
+                    <ui:Button
+                        Margin="8,0,0,0"
+                        Command="{Binding OpenLanguageSettingsCommand}"
+                        Content="Add languages" />
+                </StackPanel>
+            </ui:CardControl>
+
+            <!--  AI services  -->
+            <TextBlock Style="{StaticResource OptionHeader}" Text="AI services (online)" />
+            <ui:CardExpander Margin="0,0,0,4" IsExpanded="True">
+                <ui:CardExpander.Icon>
+                    <ui:SymbolIcon Symbol="Translate24" />
+                </ui:CardExpander.Icon>
+                <ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Translation service" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="Used by Translate PDF. All options need the internet." />
+                    </StackPanel>
+                </ui:CardExpander.Header>
+                <StackPanel>
+                    <ComboBox
+                        MaxWidth="360"
+                        HorizontalAlignment="Left"
+                        SelectedValue="{Binding Translator}"
+                        SelectedValuePath="Tag">
+                        <ComboBoxItem Content="MyMemory (free, about 5,000 characters a day)" Tag="MyMemory" />
+                        <ComboBoxItem Content="LibreTranslate (your own or a hosted server)" Tag="LibreTranslate" />
+                        <ComboBoxItem Content="Claude (Anthropic API key)" Tag="Claude" />
+                    </ComboBox>
+                    <TextBlock Style="{StaticResource OptionHeader}" Text="MyMemory email (optional, raises the daily limit to 50,000 characters)" />
+                    <ui:TextBox
+                        MaxWidth="360"
+                        HorizontalAlignment="Left"
+                        PlaceholderText="you@example.com"
+                        Text="{Binding MyMemoryEmail, UpdateSourceTrigger=LostFocus}" />
+                    <TextBlock Style="{StaticResource OptionHeader}" Text="LibreTranslate server" />
+                    <ui:TextBox
+                        MaxWidth="360"
+                        HorizontalAlignment="Left"
+                        PlaceholderText="https://translate.example.com"
+                        Text="{Binding LibreTranslateUrl, UpdateSourceTrigger=LostFocus}" />
+                    <ui:PasswordBox
+                        MaxWidth="360"
+                        Margin="0,6,0,0"
+                        HorizontalAlignment="Left"
+                        Password="{Binding LibreTranslateKey, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                        PlaceholderText="API key (if the server needs one)" />
+                </StackPanel>
+            </ui:CardExpander>
+            <ui:CardExpander Margin="0,0,0,4" IsExpanded="True">
+                <ui:CardExpander.Icon>
+                    <ui:SymbolIcon Symbol="Sparkle24" />
+                </ui:CardExpander.Icon>
+                <ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Claude by Anthropic" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="{Binding KeyStatus}" />
+                    </StackPanel>
+                </ui:CardExpander.Header>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource OptionHint}" Text="Optional. With your own API key, PageSmith can write AI summaries and translate PDFs with Claude. Document text is sent to Anthropic only when you use these features." />
+                    <ui:PasswordBox
+                        MaxWidth="420"
+                        Margin="0,6,0,0"
+                        HorizontalAlignment="Left"
+                        Password="{Binding AnthropicKey, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                        PlaceholderText="sk-ant-…" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <ui:HyperlinkButton
+                            Padding="0"
+                            Command="{Binding GetAnthropicKeyCommand}"
+                            Content="Get an API key" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource OptionHeader}" Text="Model" />
+                    <ui:TextBox
+                        MaxWidth="260"
+                        HorizontalAlignment="Left"
+                        Text="{Binding ClaudeModel, UpdateSourceTrigger=LostFocus}" />
+                    <CheckBox
+                        Margin="0,10,0,0"
+                        Content="Use Claude for summaries by default"
+                        IsChecked="{Binding UseClaudeForSummaries}" />
+                </StackPanel>
+            </ui:CardExpander>
+
+            <!--  Connection  -->
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Connection" />
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="Wifi124" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Internet connection" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="{Binding ConnectivityText}" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <ui:Button Command="{Binding CheckConnectivityCommand}" Content="Check now" />
+                    <ui:Button
+                        Margin="8,0,0,0"
+                        Command="{Binding OpenNetworkSettingsCommand}"
+                        Content="Network settings" />
+                </StackPanel>
+            </ui:CardControl>
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="Folder24" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="PageSmith data folder" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="Settings, workflows, downloaded models and the error log." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:Button Command="{Binding OpenDataFolderCommand}" Content="Open" />
+            </ui:CardControl>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
