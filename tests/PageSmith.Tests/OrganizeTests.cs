@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using PageSmith.Core.Common;
 using PageSmith.Core.Tools.Organize;
 using PdfSharp.Drawing;
@@ -12,8 +12,14 @@ public class OrganizeTests(Xunit.Abstractions.ITestOutputHelper log)
 {
     internal static string[] PageTexts(string path)
     {
+        // Raw content-order text (robust on rotated pages) plus PageSmith's reading-order text
+        // (keeps spaces for word-by-word layouts such as MigraDoc output).
         using var pig = Pig.Open(path);
-        return pig.GetPages().Select(p => p.Text).ToArray();
+        return pig.GetPages().Select((p, i) =>
+        {
+            var reading = string.Join(" ", Core.Text.TextExtractor.GetLines(Core.Text.TextExtractor.ReadPage(p, i).Words).Select(l => l.Text));
+            return (p.Text + " | " + reading).Trim(' ', '|');
+        }).ToArray();
     }
 
     [Fact]
@@ -98,7 +104,7 @@ public class OrganizeTests(Xunit.Abstractions.ITestOutputHelper log)
 
         var max = pageBytes * 2 + pageBytes / 2;
         var r = await SplitTool.RunAsync(new SplitOptions { Input = src, OutputDirectory = files.Dir, Mode = SplitMode.BySize, MaxBytesPerFile = max });
-        log.WriteLine($"pageâ‰ˆ{pageBytes} max={max} sizes={string.Join(",", r.OutputFiles.Select(f => new FileInfo(f).Length))}");
+        log.WriteLine($"page≈{pageBytes} max={max} sizes={string.Join(",", r.OutputFiles.Select(f => new FileInfo(f).Length))}");
         Assert.True(r.OutputFiles.Count >= 3);
         Assert.All(r.OutputFiles, f => Assert.True(new FileInfo(f).Length <= max));
         Assert.Equal(6, r.OutputFiles.Sum(f => PageTexts(f).Length));

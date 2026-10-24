@@ -1,4 +1,4 @@
-﻿using System.Windows.Media;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Advanced;
@@ -15,7 +15,7 @@ public static class PdfImageCodec
     public static bool IsImage(PdfDictionary dict) =>
         dict.Elements.GetName("/Subtype") == "/Image" && dict.Stream != null;
 
-    /// <summary>Returns null when the image uses a format PageSmith leaves untouched (masks, CMYK, JPEG 2000, CCITT, JBIG2, indexedâ€¦).</summary>
+    /// <summary>Returns null when the image uses a format PageSmith leaves untouched (masks, CMYK, JPEG 2000, CCITT, JBIG2, indexed…).</summary>
     public static PdfImageInfo? Inspect(PdfDictionary dict)
     {
         if (!IsImage(dict)) return null;

@@ -1,4 +1,4 @@
-﻿using PageSmith.Core.Imaging;
+using PageSmith.Core.Imaging;
 using PageSmith.Core.Pdf;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Advanced;
@@ -120,7 +120,7 @@ public static class CompressTool
         result.AddOutput(options.OutputPath);
         var saved = 1.0 - (double)result.OutputBytes / Math.Max(1, inputBytes);
         result.Summary = saved > 0.005
-            ? $"Your PDF is now {saved:P0} smaller ({Format(inputBytes)} â†’ {Format(result.OutputBytes)}); {recompressed} image{(recompressed == 1 ? "" : "s")} optimized."
+            ? $"Your PDF is now {saved:P0} smaller ({Format(inputBytes)} → {Format(result.OutputBytes)}); {recompressed} image{(recompressed == 1 ? "" : "s")} optimized."
             : $"Size unchanged ({Format(inputBytes)}).";
         scope.Report(1);
         return result;
