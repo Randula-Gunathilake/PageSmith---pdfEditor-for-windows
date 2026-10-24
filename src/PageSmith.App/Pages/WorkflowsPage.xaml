@@ -1,0 +1,203 @@
+<Page
+    x:Class="PageSmith.App.Pages.WorkflowsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="Workflows">
+    <Grid Margin="36,28,36,28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <StackPanel>
+                <ui:TextBlock FontTypography="Title" Text="Workflows" />
+                <TextBlock
+                    Margin="0,4,0,0"
+                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                    Text="Chain tools into reusable steps and run them on many files at once. (A Premium feature on iLovePDF.)"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+            <ui:Button
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Appearance="Primary"
+                Click="OnNew"
+                Content="Create workflow">
+                <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="Add24" />
+                </ui:Button.Icon>
+            </ui:Button>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,20,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition x:Name="EditorColumn" Width="0" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="List">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border
+                                Margin="0,0,0,10"
+                                Padding="18,14"
+                                Style="{StaticResource Surface}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Width="40"
+                                        Height="40"
+                                        VerticalAlignment="Top"
+                                        Background="#6E56CF"
+                                        CornerRadius="10">
+                                        <ui:SymbolIcon
+                                            FontSize="22"
+                                            Foreground="White"
+                                            Symbol="Flowchart24" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="14,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock
+                                                FontSize="15"
+                                                FontWeight="SemiBold"
+                                                Text="{Binding Name}" />
+                                            <Border
+                                                Margin="8,0,0,0"
+                                                Padding="6,1"
+                                                Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                                CornerRadius="8"
+                                                Visibility="{Binding IsPreset, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock FontSize="11" Text="Preset" />
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock
+                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                            Text="{Binding Description}"
+                                            TextWrapping="Wrap" />
+                                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Steps}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border
+                                                        Margin="0,0,6,4"
+                                                        Padding="8,3"
+                                                        Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        ToolTip="{Binding Description}">
+                                                        <TextBlock FontSize="12" Text="{Binding Title}" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                    <StackPanel
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal">
+                                        <ui:Button
+                                            Appearance="Primary"
+                                            Click="OnRun"
+                                            Content="Run"
+                                            Tag="{Binding}">
+                                            <ui:Button.Icon>
+                                                <ui:SymbolIcon Symbol="Play24" />
+                                            </ui:Button.Icon>
+                                        </ui:Button>
+                                        <ui:Button
+                                            Margin="6,0,0,0"
+                                            Click="OnEdit"
+                                            Tag="{Binding}"
+                                            ToolTip="Edit (presets are copied)">
+                                            <ui:Button.Icon>
+                                                <ui:SymbolIcon Symbol="Edit24" />
+                                            </ui:Button.Icon>
+                                        </ui:Button>
+                                        <ui:Button
+                                            Margin="6,0,0,0"
+                                            Click="OnDelete"
+                                            Tag="{Binding}"
+                                            ToolTip="Delete"
+                                            Visibility="{Binding IsPreset, Converter={StaticResource BoolToVisibilityInverted}}">
+                                            <ui:Button.Icon>
+                                                <ui:SymbolIcon Symbol="Delete24" />
+                                            </ui:Button.Icon>
+                                        </ui:Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!--  Editor  -->
+            <Border
+                x:Name="Editor"
+                Grid.Column="2"
+                Style="{StaticResource Surface}"
+                Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <ScrollViewer Padding="18" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Subtitle" Text="Edit workflow" />
+                            <TextBlock Style="{StaticResource OptionHeader}" Text="Name" />
+                            <ui:TextBox x:Name="NameBox" />
+                            <TextBlock Style="{StaticResource OptionHeader}" Text="Description" />
+                            <ui:TextBox x:Name="DescriptionBox" TextWrapping="Wrap" />
+                            <CheckBox
+                                x:Name="MergeFirstBox"
+                                Margin="0,10,0,0"
+                                Content="Merge all input files into one PDF first" />
+                            <Grid Margin="0,14,0,6">
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontWeight="SemiBold"
+                                    Text="Steps" />
+                                <ui:DropDownButton HorizontalAlignment="Right" Content="Add step">
+                                    <ui:DropDownButton.Icon>
+                                        <ui:SymbolIcon Symbol="Add24" />
+                                    </ui:DropDownButton.Icon>
+                                    <ui:DropDownButton.Flyout>
+                                        <ContextMenu x:Name="AddStepMenu" />
+                                    </ui:DropDownButton.Flyout>
+                                </ui:DropDownButton>
+                            </Grid>
+                            <StackPanel x:Name="StepsPanel" />
+                        </StackPanel>
+                    </ScrollViewer>
+                    <Border
+                        Grid.Row="1"
+                        Padding="18,12"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0">
+                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                            <ui:Button Click="OnCancelEdit" Content="Cancel" />
+                            <ui:Button
+                                Margin="8,0,0,0"
+                                Appearance="Primary"
+                                Click="OnSave"
+                                Content="Save workflow" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>
