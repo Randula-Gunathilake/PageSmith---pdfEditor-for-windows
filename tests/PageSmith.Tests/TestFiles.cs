@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using PageSmith.Core.Common;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
@@ -45,9 +45,10 @@ public sealed class TestFiles : IDisposable
     }
 
     /// <summary>A solid-colour PNG or JPEG image with a dark rectangle in the top-left quarter.</summary>
-    public string CreateImage(string name, int width, int height)
+    public string CreateImage(string name, int width, int height, int? noiseSeed = null)
     {
         var px = new Core.Imaging.PixelBuffer(width, height);
+        var rnd = noiseSeed.HasValue ? new Random(noiseSeed.Value) : null;
         for (var y = 0; y < height; y++)
         for (var x = 0; x < width; x++)
         {
@@ -57,6 +58,8 @@ public sealed class TestFiles : IDisposable
             px.Pixels[i + 1] = (byte)(dark ? 40 : (x * 255 / width));
             px.Pixels[i + 2] = (byte)(dark ? 40 : (y * 255 / height));
             px.Pixels[i + 3] = 255;
+            if (rnd != null)
+                for (var c = 0; c < 3; c++) px.Pixels[i + c] = (byte)Math.Clamp(px.Pixels[i + c] + rnd.Next(-40, 40), 0, 255);
         }
         var bmp = Core.Imaging.ImageIO.FromPixels(px);
         var bytes = name.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
