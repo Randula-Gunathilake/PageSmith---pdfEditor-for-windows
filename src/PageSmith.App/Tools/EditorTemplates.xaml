@@ -347,6 +347,199 @@
         </StackPanel>
     </DataTemplate>
 
+    <!--  ============================== Sign PDF  -->
+
+    <Style x:Key="SignaturePreviewBox" TargetType="Border">
+        <Setter Property="Width" Value="150" />
+        <Setter Property="Height" Value="48" />
+        <Setter Property="Background" Value="White" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+
+    <DataTemplate DataType="{x:Type tools:SignController}">
+        <StackPanel>
+            <TextBlock
+                Style="{StaticResource NoDocumentHint}"
+                Text="Add a PDF, then place your signature, initials, name, date or company stamp on it. You can also sign it with a digital certificate."
+                Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
+            <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{StaticResource OptionHint}" Text="Pick a part in the toolbar above the page, then click where it goes." />
+
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Your name" />
+                <ui:TextBox PlaceholderText="Full name" Text="{Binding SignerName, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Signature" />
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource SignaturePreviewBox}">
+                        <Image
+                            Margin="4"
+                            RenderOptions.BitmapScalingMode="HighQuality"
+                            Source="{Binding SignaturePreview}" />
+                    </Border>
+                    <ui:Button
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Command="{Binding CreateSignatureCommand}"
+                        Content="Draw or type…" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Initials" />
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource SignaturePreviewBox}">
+                        <Image
+                            Margin="4"
+                            RenderOptions.BitmapScalingMode="HighQuality"
+                            Source="{Binding InitialsPreview}" />
+                    </Border>
+                    <ui:Button
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Command="{Binding CreateInitialsCommand}"
+                        Content="Draw or type…" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Company stamp" />
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource SignaturePreviewBox}">
+                        <Image
+                            Margin="4"
+                            RenderOptions.BitmapScalingMode="HighQuality"
+                            Source="{Binding StampPreview}" />
+                    </Border>
+                    <ui:Button
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Command="{Binding ChooseStampCommand}"
+                        Content="Choose image…" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Date format" />
+                <ComboBox ItemsSource="{Binding DateFormats}" SelectedItem="{Binding DateFormat}" />
+
+                <!--  Selected text box  -->
+                <StackPanel Visibility="{Binding PropertiesTarget, Converter={StaticResource NullToVisibility}}">
+                    <Border
+                        Height="1"
+                        Margin="0,14,0,4"
+                        Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+                    <TextBlock
+                        FontSize="16"
+                        FontWeight="SemiBold"
+                        Text="{Binding SelectedItem.Kind}" />
+                    <ContentControl Content="{Binding PropertiesTarget}" Focusable="False" />
+                </StackPanel>
+                <ui:Button
+                    Margin="0,10,0,0"
+                    Command="{Binding DeleteSelectedCommand}"
+                    Content="Remove selected"
+                    Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="Delete24" />
+                    </ui:Button.Icon>
+                </ui:Button>
+
+                <!--  Digital signature  -->
+                <Border
+                    Height="1"
+                    Margin="0,16,0,6"
+                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+                <CheckBox Content="Sign with a certificate (digital signature)" IsChecked="{Binding UseDigital}" />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Proves who signed and shows if the PDF is changed afterwards. A Premium feature on iLovePDF." />
+                <StackPanel Visibility="{Binding UseDigital, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Style="{StaticResource OptionHeader}" Text="Certificate" />
+                    <WrapPanel>
+                        <RadioButton
+                            Content="From Windows"
+                            GroupName="CertSource"
+                            IsChecked="{Binding Source, Converter={StaticResource EnumEquals}, ConverterParameter=Windows}"
+                            Style="{StaticResource Segment}" />
+                        <RadioButton
+                            Content="From a file"
+                            GroupName="CertSource"
+                            IsChecked="{Binding Source, Converter={StaticResource EnumEquals}, ConverterParameter=File}"
+                            Style="{StaticResource Segment}" />
+                        <RadioButton
+                            Content="Create new"
+                            GroupName="CertSource"
+                            IsChecked="{Binding Source, Converter={StaticResource EnumEquals}, ConverterParameter=New}"
+                            Style="{StaticResource Segment}" />
+                    </WrapPanel>
+                    <StackPanel Visibility="{Binding Source, Converter={StaticResource EnumToVisibility}, ConverterParameter=Windows}">
+                        <ComboBox
+                            DisplayMemberPath="Text"
+                            ItemsSource="{Binding StoreCertificates}"
+                            SelectedItem="{Binding SelectedCertificate}" />
+                        <TextBlock
+                            Style="{StaticResource OptionHint}"
+                            Text="No signing certificates were found in your Windows certificate store. Use a .pfx file or create a new certificate."
+                            Visibility="{Binding NoStoreCertificates, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding Source, Converter={StaticResource EnumToVisibility}, ConverterParameter=File}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Command="{Binding ChoosePfxCommand}" Content="Choose .pfx file…" />
+                            <TextBlock
+                                Margin="10,0,0,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource OptionHint}"
+                                Text="{Binding PfxName}" />
+                        </StackPanel>
+                        <ui:PasswordBox
+                            Margin="0,6,0,0"
+                            Password="{Binding PfxPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            PlaceholderText="Certificate password" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding Source, Converter={StaticResource EnumToVisibility}, ConverterParameter=New}">
+                        <ui:TextBox PlaceholderText="Name on the certificate" Text="{Binding NewCertName, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox
+                            Margin="0,6,0,0"
+                            PlaceholderText="Email (optional)"
+                            Text="{Binding NewCertEmail, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox
+                            Margin="0,6,0,0"
+                            PlaceholderText="Organisation (optional)"
+                            Text="{Binding NewCertOrganization, UpdateSourceTrigger=PropertyChanged}" />
+                        <CheckBox
+                            Margin="0,8,0,0"
+                            Content="Keep it in my Windows certificate store"
+                            IsChecked="{Binding SaveNewCertToWindows}" />
+                        <ui:Button
+                            Margin="0,8,0,0"
+                            Command="{Binding CreateCertificateCommand}"
+                            Content="Create certificate">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="Certificate24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <TextBlock Style="{StaticResource OptionHint}" Text="A self-signed certificate. PDF readers show the signature as valid but from an unverified signer until they trust it." />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource OptionHeader}" Text="Reason and place (optional)" />
+                    <ui:TextBox PlaceholderText="Reason, e.g. I approve this document" Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" />
+                    <ui:TextBox
+                        Margin="0,6,0,0"
+                        PlaceholderText="Location, e.g. Colombo"
+                        Text="{Binding Location, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock
+                        Margin="0,10,0,0"
+                        Style="{StaticResource OptionHint}"
+                        Text="Shown in the box you drew on the page."
+                        Visibility="{Binding HasDigitalBox, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock
+                        Margin="0,10,0,0"
+                        Style="{StaticResource OptionHint}"
+                        Text="Invisible signature. To show it on the page, pick the certificate tool above the page and drag a box."
+                        Visibility="{Binding HasDigitalBox, Converter={StaticResource BoolToVisibilityInverted}}" />
+                    <CheckBox
+                        Margin="0,6,0,0"
+                        Content="Show my handwritten signature in the box"
+                        IsChecked="{Binding ShowHandwritingInBox}" />
+                    <CheckBox
+                        Margin="0,6,0,0"
+                        Content="Add a trusted timestamp (needs the internet)"
+                        IsChecked="{Binding AddTimestamp}" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+
     <!--  ============================== PDF Forms  -->
 
     <DataTemplate DataType="{x:Type tools:FormsController}">

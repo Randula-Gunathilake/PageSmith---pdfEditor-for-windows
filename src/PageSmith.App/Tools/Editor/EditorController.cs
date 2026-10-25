@@ -426,6 +426,9 @@ public abstract partial class EditorController : ToolController
     /// </summary>
     public virtual Task SeedDemoAsync() => Task.CompletedTask;
 
+    /// <summary>Development aid for --demo-dialog: opens the tool's main dialog without waiting for it.</summary>
+    public virtual void ShowDemoDialog() { }
+
     /// <summary>Default box size for something placed with a click, centred on the point and kept on the page.</summary>
     protected Rect PlaceBox(int page, Point centre, Size size)
     {

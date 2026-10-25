@@ -363,6 +363,7 @@ public sealed partial class EditController() : EditorController("edit")
 
     public override async Task SeedDemoAsync()
     {
+        CurrentPageIndex = 0;
         var page = CurrentPageIndex;
         await PickAsync(EditTextTool, page, new Point(110, 82));
         if (SelectedItem is TextItem title) title.Text = "Annual Report 2026";

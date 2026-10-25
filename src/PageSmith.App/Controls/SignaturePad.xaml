@@ -1,0 +1,175 @@
+<UserControl
+    x:Class="PageSmith.App.Controls.SignaturePad"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:PageSmith.App.Controls"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Width="600">
+    <StackPanel>
+        <WrapPanel Margin="0,0,0,10">
+            <RadioButton
+                x:Name="DrawTab"
+                Checked="OnTabChanged"
+                Content="Draw"
+                GroupName="SignatureTabs"
+                IsChecked="True"
+                Style="{StaticResource Segment}" />
+            <RadioButton
+                x:Name="TypeTab"
+                Checked="OnTabChanged"
+                Content="Type"
+                GroupName="SignatureTabs"
+                Style="{StaticResource Segment}" />
+            <RadioButton
+                x:Name="UploadTab"
+                Checked="OnTabChanged"
+                Content="Upload"
+                GroupName="SignatureTabs"
+                Style="{StaticResource Segment}" />
+        </WrapPanel>
+
+        <Border
+            Height="200"
+            Background="White"
+            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Grid ClipToBounds="True">
+                <!--  Signing line  -->
+                <Line
+                    x:Name="Baseline"
+                    Margin="32,0,32,52"
+                    VerticalAlignment="Bottom"
+                    Stretch="Fill"
+                    Stroke="#B0B0B0"
+                    StrokeDashArray="4 3"
+                    StrokeThickness="1"
+                    X1="0"
+                    X2="1" />
+                <TextBlock
+                    x:Name="SignHere"
+                    Margin="34,0,0,30"
+                    VerticalAlignment="Bottom"
+                    FontSize="12"
+                    Foreground="#909090"
+                    IsHitTestVisible="False"
+                    Text="Sign above the line" />
+                <InkCanvas
+                    x:Name="Ink"
+                    Background="Transparent"
+                    Cursor="Pen"
+                    StrokeCollected="OnStrokeCollected" />
+                <TextBlock
+                    x:Name="Typed"
+                    Margin="24,0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    FontSize="60"
+                    TextTrimming="CharacterEllipsis"
+                    Visibility="Collapsed" />
+                <Image
+                    x:Name="Uploaded"
+                    Margin="16"
+                    RenderOptions.BitmapScalingMode="HighQuality"
+                    Stretch="Uniform"
+                    Visibility="Collapsed" />
+                <TextBlock
+                    x:Name="UploadHint"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Foreground="#808080"
+                    Text="Choose a photo or scan of your signature."
+                    Visibility="Collapsed" />
+            </Grid>
+        </Border>
+
+        <!--  Draw  -->
+        <Grid x:Name="DrawOptions" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                Margin="0,0,10,0"
+                VerticalAlignment="Center"
+                Text="Pen" />
+            <Slider
+                x:Name="PenWidth"
+                Grid.Column="1"
+                MaxWidth="200"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Maximum="8"
+                Minimum="1.5"
+                ValueChanged="OnPenChanged"
+                Value="3" />
+            <ui:Button
+                Grid.Column="2"
+                Click="OnClear"
+                Content="Clear">
+                <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="Eraser24" />
+                </ui:Button.Icon>
+            </ui:Button>
+        </Grid>
+
+        <!--  Type  -->
+        <StackPanel
+            x:Name="TypeOptions"
+            Margin="0,10,0,0"
+            Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="220" />
+                </Grid.ColumnDefinitions>
+                <ui:TextBox
+                    x:Name="TypedText"
+                    PlaceholderText="Your name"
+                    TextChanged="OnTypedChanged" />
+                <ComboBox
+                    x:Name="FontChoice"
+                    Grid.Column="2"
+                    SelectionChanged="OnTypedChanged">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock
+                                FontFamily="{Binding}"
+                                FontSize="18"
+                                Text="{Binding}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </Grid>
+        </StackPanel>
+
+        <!--  Upload  -->
+        <StackPanel
+            x:Name="UploadOptions"
+            Margin="0,10,0,0"
+            Orientation="Horizontal"
+            Visibility="Collapsed">
+            <ui:Button Click="OnChooseImage" Content="Choose image…">
+                <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="ImageAdd24" />
+                </ui:Button.Icon>
+            </ui:Button>
+            <CheckBox
+                x:Name="RemoveBackground"
+                Margin="16,0,0,0"
+                VerticalAlignment="Center"
+                Checked="OnRemoveBackgroundChanged"
+                Content="Remove the white background"
+                IsChecked="True"
+                Unchecked="OnRemoveBackgroundChanged" />
+        </StackPanel>
+
+        <TextBlock
+            Margin="0,12,0,4"
+            FontWeight="SemiBold"
+            Text="Colour" />
+        <controls:ColorPicker x:Name="InkColor" Color="#1F3A93" />
+    </StackPanel>
+</UserControl>
