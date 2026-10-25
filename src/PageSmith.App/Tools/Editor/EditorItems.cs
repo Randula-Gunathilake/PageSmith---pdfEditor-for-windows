@@ -348,7 +348,11 @@ public sealed partial class FieldItem : EditorItem
     /// <summary>Font size for filling the field in place (existing fields keep their size).</summary>
     public double InputFontSize => Multiline ? Math.Clamp(Bounds.Height / 5, 6, 11) : Math.Clamp(Bounds.Height * 0.6, 5, 13);
 
-    public IReadOnlyList<string> Options => OptionsText.Split([',', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    /// <summary>Options of an existing field, exactly as stored in the PDF (they may contain commas).</summary>
+    public IReadOnlyList<string>? FixedOptions { get; init; }
+
+    public IReadOnlyList<string> Options => FixedOptions ?? OptionsText.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    public bool IsNew => !IsExisting;
     public bool HasOptions => FieldKind is FormFieldKind.ComboBox or FormFieldKind.ListBox or FormFieldKind.RadioGroup;
     public bool IsText => FieldKind == FormFieldKind.Text;
     public bool IsCheck => FieldKind == FormFieldKind.CheckBox;
