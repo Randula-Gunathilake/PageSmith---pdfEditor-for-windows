@@ -160,7 +160,7 @@ public static class ToolRegistry
 
         // Intelligence
         new("summarize", "AI Summarizer", "Get a concise summary and key points of any PDF.", ToolCategory.Intelligence, SymbolRegular.Sparkle24, Indigo, "Summarize", InputKind.Pdf, false, () => new SummarizeController())
-            { OnlineNote = "Works offline; Claude summaries need the internet.", ILovePdfTier = "Free (25,000 words) · AI credits" },
+            { ILovePdfTier = "Free (25,000 words) · AI credits" },
         new("translate", "Translate PDF", "Translate PDFs while keeping the layout.", ToolCategory.Intelligence, SymbolRegular.Translate24, Indigo, "Translate", InputKind.Pdf, false, () => new TranslateController())
             { OnlineNote = "Translation services need the internet.", ILovePdfTier = "Free (30 pages) · AI credits" },
     ];

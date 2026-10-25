@@ -94,14 +94,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         set { S.ClaudeModel = string.IsNullOrWhiteSpace(value) ? Core.Intelligence.ClaudeService.DefaultModel : value.Trim(); Save(); }
     }
 
-    public bool UseClaudeForSummaries
-    {
-        get => S.UseClaudeForSummaries;
-        set { S.UseClaudeForSummaries = value; Save(); }
-    }
-
     public string KeyStatus => S.AnthropicKey.Length == 0
-        ? "No key saved. Claude features stay off; everything else works."
+        ? "No key saved. Claude translation stays off; everything else works."
         : "A key is saved for this Windows account (encrypted with Windows Data Protection).";
 
     public string OfficeStatus

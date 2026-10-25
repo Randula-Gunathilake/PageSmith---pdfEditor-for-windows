@@ -882,23 +882,7 @@
                     IsChecked="{Binding Length, Converter={StaticResource EnumEquals}, ConverterParameter=Long}"
                     Style="{StaticResource Segment}" />
             </WrapPanel>
-            <TextBlock Style="{StaticResource OptionHeader}" Text="Engine" />
-            <RadioButton IsChecked="{Binding UseClaude, Converter={StaticResource InverseBool}}" Style="{StaticResource OptionCard}">
-                <StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="On this PC" />
-                    <TextBlock Style="{StaticResource OptionHint}" Text="Picks the key sentences. Private and offline." />
-                </StackPanel>
-            </RadioButton>
-            <RadioButton IsChecked="{Binding UseClaude}" Style="{StaticResource OptionCard}">
-                <StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="Claude (online)" />
-                    <TextBlock Style="{StaticResource OptionHint}" Text="Writes a summary in your words of choice. Needs the internet and your Anthropic API key." />
-                </StackPanel>
-            </RadioButton>
-            <StackPanel Visibility="{Binding UseClaude, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Style="{StaticResource OptionHeader}" Text="Summary language" />
-                <ComboBox ItemsSource="{Binding LanguageNames}" SelectedItem="{Binding OutputLanguage}" />
-            </StackPanel>
+            <TextBlock Style="{StaticResource OptionHint}" Text="Picks the key sentences and keywords on this PC. Your document never leaves your computer." />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Save as" />
             <WrapPanel>
                 <RadioButton
