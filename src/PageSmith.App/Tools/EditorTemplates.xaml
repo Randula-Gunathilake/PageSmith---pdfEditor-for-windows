@@ -1,0 +1,296 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:PageSmith.App.Controls"
+    xmlns:editor="clr-namespace:PageSmith.App.Tools.Editor"
+    xmlns:tools="clr-namespace:PageSmith.App.Tools"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!--  Options panels of the page-editor tools (Crop, Edit, Forms, Sign, Redact) and the property panels of the items they place.  -->
+
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/PageSmith;component/Themes/Styles.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <Style x:Key="NoDocumentHint" TargetType="TextBlock">
+        <Setter Property="Margin" Value="0,2,0,6" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    </Style>
+
+    <Style x:Key="OpacityRow" TargetType="Grid">
+        <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+
+    <!--  ============================== Item properties  -->
+
+    <DataTemplate DataType="{x:Type editor:TextItem}">
+        <StackPanel>
+            <StackPanel Visibility="{Binding IsStyleOnly, Converter={StaticResource BoolToVisibilityInverted}}">
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Text" />
+                <ui:TextBox
+                    MinHeight="64"
+                    AcceptsReturn="True"
+                    Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Font" />
+            <ComboBox
+                IsEditable="True"
+                ItemsSource="{x:Static editor:TextItem.AvailableFonts}"
+                Text="{Binding FontName}" />
+            <Grid Margin="0,6,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="96" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ui:NumberBox
+                    ClearButtonEnabled="False"
+                    MaxDecimalPlaces="1"
+                    Maximum="400"
+                    Minimum="3"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Hidden"
+                    ToolTip="Font size in points"
+                    Value="{Binding FontSize}" />
+                <WrapPanel Grid.Column="1" Margin="8,0,0,0">
+                    <ToggleButton
+                        Width="34"
+                        Margin="0,0,4,0"
+                        Content="B"
+                        FontWeight="Bold"
+                        IsChecked="{Binding Bold}"
+                        ToolTip="Bold" />
+                    <ToggleButton
+                        Width="34"
+                        Margin="0,0,4,0"
+                        Content="I"
+                        FontStyle="Italic"
+                        IsChecked="{Binding Italic}"
+                        ToolTip="Italic" />
+                    <ToggleButton
+                        Width="34"
+                        IsChecked="{Binding Underline}"
+                        ToolTip="Underline">
+                        <TextBlock Text="U" TextDecorations="Underline" />
+                    </ToggleButton>
+                </WrapPanel>
+            </Grid>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Alignment" />
+            <WrapPanel>
+                <RadioButton
+                    Content="Left"
+                    GroupName="TextAlign"
+                    IsChecked="{Binding Align, Converter={StaticResource EnumEquals}, ConverterParameter=Left}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Centre"
+                    GroupName="TextAlign"
+                    IsChecked="{Binding Align, Converter={StaticResource EnumEquals}, ConverterParameter=Center}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Right"
+                    GroupName="TextAlign"
+                    IsChecked="{Binding Align, Converter={StaticResource EnumEquals}, ConverterParameter=Right}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Colour" />
+            <controls:ColorPicker Color="{Binding Color}" />
+            <CheckBox
+                Margin="0,10,0,0"
+                Content="Cover what's underneath"
+                IsChecked="{Binding HasBackground}"
+                ToolTip="Draws a box behind the text so the original content doesn't show through." />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Opacity" />
+            <Slider
+                LargeChange="0.1"
+                Maximum="1"
+                Minimum="0.1"
+                SmallChange="0.05"
+                Value="{Binding Opacity}" />
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type editor:ShapeItem}">
+        <StackPanel>
+            <TextBlock
+                Style="{StaticResource OptionHint}"
+                Text="A white box that hides whatever is underneath it. Resize it with its handles."
+                Visibility="{Binding IsWhiteout, Converter={StaticResource BoolToVisibility}}" />
+            <StackPanel Visibility="{Binding IsWhiteout, Converter={StaticResource BoolToVisibilityInverted}}">
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Line colour" />
+                <controls:ColorPicker Color="{Binding Stroke}" />
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Line width" />
+                <Slider
+                    Maximum="16"
+                    Minimum="0.5"
+                    SmallChange="0.5"
+                    Value="{Binding StrokeWidth}" />
+                <StackPanel Visibility="{Binding IsLine, Converter={StaticResource BoolToVisibilityInverted}}">
+                    <CheckBox
+                        Margin="0,10,0,0"
+                        Content="Fill the shape"
+                        IsChecked="{Binding FillEnabled}" />
+                    <controls:ColorPicker
+                        Margin="0,6,0,0"
+                        Color="{Binding FillColor}"
+                        Visibility="{Binding HasFill, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Opacity" />
+                <Slider
+                    LargeChange="0.1"
+                    Maximum="1"
+                    Minimum="0.1"
+                    SmallChange="0.05"
+                    Value="{Binding Opacity}" />
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type editor:InkItem}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Pen colour" />
+            <controls:ColorPicker Color="{Binding Color}" />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Pen width" />
+            <Slider
+                Maximum="12"
+                Minimum="0.5"
+                SmallChange="0.5"
+                Value="{Binding Width}" />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Opacity" />
+            <Slider
+                LargeChange="0.1"
+                Maximum="1"
+                Minimum="0.1"
+                SmallChange="0.05"
+                Value="{Binding Opacity}" />
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type editor:ImageItem}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource OptionHint}" Text="Drag the corner handles to resize; the picture keeps its proportions." />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Opacity" />
+            <Slider
+                LargeChange="0.1"
+                Maximum="1"
+                Minimum="0.1"
+                SmallChange="0.05"
+                Value="{Binding Opacity}" />
+        </StackPanel>
+    </DataTemplate>
+
+    <!--  Layer and delete buttons for a selected item.  -->
+    <DataTemplate x:Key="SelectionActions">
+        <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Arrange" />
+            <WrapPanel>
+                <ui:Button
+                    Margin="0,0,6,6"
+                    Command="{Binding BringForwardCommand}"
+                    Content="Bring to front">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="ArrowUp24" />
+                    </ui:Button.Icon>
+                </ui:Button>
+                <ui:Button
+                    Margin="0,0,6,6"
+                    Command="{Binding SendBackwardCommand}"
+                    Content="Send to back">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="ArrowDown24" />
+                    </ui:Button.Icon>
+                </ui:Button>
+                <ui:Button
+                    Margin="0,0,6,6"
+                    Command="{Binding DeleteSelectedCommand}"
+                    Content="Delete">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="Delete24" />
+                    </ui:Button.Icon>
+                </ui:Button>
+            </WrapPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <!--  ============================== Crop  -->
+
+    <DataTemplate DataType="{x:Type tools:CropController}">
+        <StackPanel>
+            <TextBlock
+                Style="{StaticResource NoDocumentHint}"
+                Text="Add a PDF, then drag the frame on the page to choose the area to keep."
+                Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
+            <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{StaticResource OptionHint}" Text="Drag the frame or its handles on the page. Everything outside the frame is cut away." />
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Crop" />
+                <RadioButton IsChecked="{Binding CurrentPageOnly, Converter={StaticResource InverseBool}}" Style="{StaticResource OptionCard}">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="All pages" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="The same area is kept on every page." />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton IsChecked="{Binding CurrentPageOnly}" Style="{StaticResource OptionCard}">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="This page only" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="Only the page shown is cropped." />
+                    </StackPanel>
+                </RadioButton>
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Area" />
+                <TextBlock Style="{StaticResource OptionHint}" Text="{Binding AreaText}" />
+                <WrapPanel Margin="0,4,0,0">
+                    <ui:Button
+                        Margin="0,0,6,6"
+                        Command="{Binding AutoDetectCommand}"
+                        Content="Fit to content">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="Wand24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                    <ui:Button
+                        Margin="0,0,6,6"
+                        Command="{Binding ResetAreaCommand}"
+                        Content="Whole page">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="ArrowReset24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                </WrapPanel>
+                <TextBlock Style="{StaticResource OptionHint}" Text="Cropping hides the outside area in every PDF viewer. To remove sensitive content for good, use Redact PDF." />
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <!--  ============================== Edit PDF  -->
+
+    <DataTemplate DataType="{x:Type tools:EditController}">
+        <StackPanel>
+            <TextBlock
+                Style="{StaticResource NoDocumentHint}"
+                Text="Add a PDF, then use the toolbar above the page to add text, images, shapes and drawings, or to change existing text."
+                Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
+            <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock
+                    Style="{StaticResource OptionHint}"
+                    Text="Pick a tool above the page. Select an item to change its look here."
+                    Visibility="{Binding PropertiesTarget, Converter={StaticResource NullToVisibilityInverted}}" />
+                <TextBlock
+                    FontSize="16"
+                    FontWeight="SemiBold"
+                    Text="{Binding SelectedItem.Kind}"
+                    Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock
+                    FontSize="16"
+                    FontWeight="SemiBold"
+                    Text="Style for new items"
+                    Visibility="{Binding PropertiesTarget.IsStyleOnly, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                <ContentControl Content="{Binding PropertiesTarget}" Focusable="False" />
+                <ContentControl
+                    Content="{Binding}"
+                    ContentTemplate="{StaticResource SelectionActions}"
+                    Focusable="False" />
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+</ResourceDictionary>

@@ -48,6 +48,16 @@ public sealed class BoolToVisibilityConverter : IValueConverter
         value is Visibility v && (v == Visibility.Visible) ^ Invert;
 }
 
+/// <summary>Picks <see cref="TrueValue"/> or <see cref="FalseValue"/> from a boolean.</summary>
+public sealed class BoolToValueConverter : IValueConverter
+{
+    public object? TrueValue { get; set; }
+    public object? FalseValue { get; set; }
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is true ? TrueValue : FalseValue;
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
 public sealed class InverseBoolConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not true;
@@ -57,8 +67,12 @@ public sealed class InverseBoolConverter : IValueConverter
 /// <summary>"#RRGGBB" → brush.</summary>
 public sealed class HexToBrushConverter : IValueConverter
 {
+    /// <summary>Returns a transparent brush for null instead of grey (optional fills).</summary>
+    public bool NullIsTransparent { get; set; }
+
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
+        if (value == null && NullIsTransparent) return Brushes.Transparent;
         try
         {
             return new SolidColorBrush((Color)ColorConverter.ConvertFromString(value as string ?? "#808080"));

@@ -98,7 +98,7 @@ public static class ToolRegistry
     };
 
     /// <summary>Tools still on placeholder controllers (see PendingControllers.cs and TODO.md).</summary>
-    public static readonly HashSet<string> InProgressIds = ["scan", "html-to-pdf", "crop", "edit", "forms", "sign", "redact", "compare"];
+    public static readonly HashSet<string> InProgressIds = ["scan", "html-to-pdf", "forms", "sign", "redact", "compare"];
 
     private const string Red = "#E5484D", Green = "#46A758", Blue = "#3E63DD", Purple = "#8E4EC6", Orange = "#F76B15", Teal = "#12A594", Gold = "#D9A400", Indigo = "#6E56CF";
 

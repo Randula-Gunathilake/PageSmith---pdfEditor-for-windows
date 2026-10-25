@@ -11,6 +11,7 @@
                 <ui:ControlsDictionary />
                 <ResourceDictionary Source="/PageSmith;component/Themes/Styles.xaml" />
                 <ResourceDictionary Source="/PageSmith;component/Tools/OptionTemplates.xaml" />
+                <ResourceDictionary Source="/PageSmith;component/Tools/EditorTemplates.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
