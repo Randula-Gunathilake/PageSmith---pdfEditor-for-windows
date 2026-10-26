@@ -830,8 +830,11 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <ui:NumberBox
+                    ClearButtonEnabled="False"
                     Maximum="200"
                     Minimum="4"
+                    SpinButtonPlacementMode="Hidden"
+                    ToolTip="Font size in points"
                     Value="{Binding FontSize}" />
                 <WrapPanel Grid.Column="1" Margin="8,0,0,0">
                     <ToggleButton
@@ -881,8 +884,11 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <ui:NumberBox
+                        ClearButtonEnabled="False"
                         Maximum="400"
                         Minimum="4"
+                        SpinButtonPlacementMode="Hidden"
+                        ToolTip="Font size in points"
                         Value="{Binding FontSize}" />
                     <WrapPanel Grid.Column="1" Margin="8,0,0,0">
                         <ToggleButton

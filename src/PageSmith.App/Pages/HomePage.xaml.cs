@@ -18,6 +18,28 @@ public partial class HomePage : Page
         InitializeComponent();
         BuildFilters();
         ApplyFilter(null);
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible) ShowRecent();
+        };
+    }
+
+    /// <summary>Recently opened PDFs that still exist.</summary>
+    private void ShowRecent()
+    {
+        var recent = AppServices.Settings.RecentFiles
+            .Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(f))
+            .Take(6)
+            .ToList();
+        Recent.ItemsSource = recent;
+        NoRecent.Visibility = recent.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void OnOpenDocument(object sender, RoutedEventArgs e) => await AppServices.Documents.BrowseAsync();
+
+    private async void OnRecentClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is string path) await AppServices.Documents.OpenAsync([path]);
     }
 
     private void BuildFilters()
@@ -92,7 +114,20 @@ public partial class HomePage : Page
         if (_dropped.Length == 0) return;
         var tools = ToolRegistry.All.Where(t => _dropped.Any(t.Accepts)).ToList();
         DropTitle.Text = _dropped.Length == 1 ? $"What do you want to do with \"{Path.GetFileName(_dropped[0])}\"?" : $"What do you want to do with these {_dropped.Length} files?";
-        DropHint.Text = tools.Count == 0 ? "None of the tools can open these files." : "Pick a tool:";
+        var openable = _dropped.Where(Documents.DocumentWorkspace.CanOpen).ToList();
+        DropHint.Text = tools.Count == 0 && openable.Count == 0 ? "PageSmith can't open these files." : "Open them in tabs, or pick a tool:";
+        if (openable.Count > 0)
+        {
+            var open = new Wpf.Ui.Controls.Button
+            {
+                Content = openable.Count == 1 ? "Open in a tab" : $"Open {openable.Count} in tabs",
+                Icon = new SymbolIcon(SymbolRegular.Open24),
+                Appearance = ControlAppearance.Primary,
+                Margin = new Thickness(0, 0, 6, 6),
+            };
+            open.Click += async (_, _) => await AppServices.Documents.OpenAsync(openable);
+            Suggestions.Children.Add(open);
+        }
         foreach (var tool in tools)
         {
             var chip = new Wpf.Ui.Controls.Button

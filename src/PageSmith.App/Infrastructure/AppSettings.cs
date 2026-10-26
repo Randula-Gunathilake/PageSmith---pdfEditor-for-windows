@@ -55,6 +55,12 @@ public sealed class AppSettings
     /// <summary>Where the main window was when PageSmith last closed; null until then.</summary>
     public WindowPlacement? Window { get; set; }
 
+    /// <summary>The reader's left panel: "pages", "bookmarks", or "" when closed.</summary>
+    public string ReaderPanel { get; set; } = "pages";
+
+    /// <summary>Whether the reader shows the All tools pane.</summary>
+    public bool ReaderToolsPane { get; set; } = true;
+
     public List<string> RecentFiles { get; set; } = [];
     public List<string> FavoriteTools { get; set; } = ["merge", "split", "compress", "pdf-to-word", "edit", "sign"];
 

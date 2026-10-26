@@ -51,6 +51,12 @@ public sealed record ToolDescriptor(
     /// <summary>True while the tool's engine is done but its interactive screen is still being built.</summary>
     public bool InProgress => ToolRegistry.InProgressIds.Contains(Id);
 
+    /// <summary>
+    /// True when the tool changes the document it works on (rotate, edit, sign…). Used on an open document,
+    /// its result replaces the document in its tab, with undo. Other tools (export, split…) save new files.
+    /// </summary>
+    public bool EditsDocument => ToolRegistry.DocumentEditingIds.Contains(Id);
+
     public string[] Extensions => Input switch
     {
         InputKind.Images => Core.Imaging.ImageIO.SupportedExtensions,
@@ -99,6 +105,16 @@ public static class ToolRegistry
 
     /// <summary>Tools whose screens are still being built (none at the moment); they show an "In progress" chip.</summary>
     public static readonly HashSet<string> InProgressIds = [];
+
+    /// <summary>Tools whose single PDF result replaces the open document (see <see cref="ToolDescriptor.EditsDocument"/>).</summary>
+    public static readonly HashSet<string> DocumentEditingIds =
+    [
+        "merge", "remove-pages", "organize", "compress", "repair", "ocr", "pdf-to-pdfa", "rotate", "page-numbers",
+        "watermark", "crop", "edit", "forms", "unlock", "protect", "sign", "redact",
+    ];
+
+    /// <summary>Tools offered on an open document (everything that takes a PDF).</summary>
+    public static IEnumerable<ToolDescriptor> DocumentTools => All.Where(t => t.Input == InputKind.Pdf);
 
     private const string Red = "#E5484D", Green = "#46A758", Blue = "#3E63DD", Purple = "#8E4EC6", Orange = "#F76B15", Teal = "#12A594", Gold = "#D9A400", Indigo = "#6E56CF";
 

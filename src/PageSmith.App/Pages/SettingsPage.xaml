@@ -34,6 +34,35 @@
                 </ComboBox>
             </ui:CardControl>
 
+            <!--  Opening PDFs  -->
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Opening PDFs" />
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:SymbolIcon Symbol="DocumentPdf24" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Default PDF app" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="{Binding PdfAppStatus}" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <ui:Button
+                        Appearance="Primary"
+                        Command="{Binding RegisterPdfAppCommand}"
+                        Content="Open PDFs with PageSmith">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="Open24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                    <ui:Button
+                        Margin="8,0,0,0"
+                        Command="{Binding UnregisterPdfAppCommand}"
+                        Content="Remove"
+                        Visibility="{Binding IsPdfAppRegistered, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </ui:CardControl>
+
             <!--  Saving  -->
             <TextBlock Style="{StaticResource OptionHeader}" Text="Saving results" />
             <ui:CardControl Margin="0,0,0,4">

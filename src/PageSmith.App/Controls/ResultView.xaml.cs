@@ -67,7 +67,12 @@ public partial class ResultView : UserControl
         else Open(outputs[0]);
     }
 
-    private static void Open(string path) => AppServices.OpenFile(path);
+    /// <summary>PDFs open in a PageSmith tab; other files in their own app.</summary>
+    private static async void Open(string path)
+    {
+        if (path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) await AppServices.Documents.OpenAsync([path]);
+        else AppServices.OpenFile(path);
+    }
 
     private void OnCopyText(object sender, RoutedEventArgs e)
     {

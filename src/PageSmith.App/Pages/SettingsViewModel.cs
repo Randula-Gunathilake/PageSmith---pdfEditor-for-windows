@@ -2,6 +2,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PageSmith.App.Infrastructure;
+using PageSmith.Core.Common;
 using PageSmith.Core.Net;
 using PageSmith.Core.Ocr;
 using PageSmith.Core.Office;
@@ -148,6 +149,50 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [RelayCommand]
     private static void GetAnthropicKey() => AppServices.OpenUri("https://console.anthropic.com/settings/keys");
+
+    // ------------------------------------------------------------------ opening PDFs
+
+    private static string Exe => Environment.ProcessPath ?? "";
+
+    public bool IsPdfAppRegistered => PdfAppRegistration.IsRegistered(Exe);
+
+    public string PdfAppStatus => IsPdfAppRegistered
+        ? "PageSmith is in the “Open with” list for PDFs. To open every PDF with it, choose it in Windows’ Default apps."
+        : "Add PageSmith to the “Open with” list for PDFs, then choose it as the default PDF app in Windows’ Default apps.";
+
+    /// <summary>Registers PageSmith for PDFs and opens Windows' default apps page, where the user makes it the default.</summary>
+    [RelayCommand]
+    private void RegisterPdfApp()
+    {
+        try
+        {
+            PdfAppRegistration.Register(Exe);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+        {
+            AppServices.Notify("Couldn't register PageSmith", ex.Message, Wpf.Ui.Controls.ControlAppearance.Danger, Wpf.Ui.Controls.SymbolRegular.ErrorCircle24);
+            return;
+        }
+        OnPropertyChanged(nameof(IsPdfAppRegistered));
+        OnPropertyChanged(nameof(PdfAppStatus));
+        AppServices.OpenUri(PdfAppRegistration.DefaultAppsSettings);
+    }
+
+    [RelayCommand]
+    private void UnregisterPdfApp()
+    {
+        try
+        {
+            PdfAppRegistration.Unregister(Exe);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+        {
+            AppServices.Notify("Couldn't remove PageSmith", ex.Message, Wpf.Ui.Controls.ControlAppearance.Danger, Wpf.Ui.Controls.SymbolRegular.ErrorCircle24);
+            return;
+        }
+        OnPropertyChanged(nameof(IsPdfAppRegistered));
+        OnPropertyChanged(nameof(PdfAppStatus));
+    }
 
     private static void Save() => AppServices.SaveSettings();
 }
