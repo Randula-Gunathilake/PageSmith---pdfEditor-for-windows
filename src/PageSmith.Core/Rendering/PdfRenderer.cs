@@ -15,6 +15,7 @@ public sealed class PdfRenderer : IDisposable
     private readonly WinPdfDocument _doc;
     private readonly IRandomAccessStream _stream;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private volatile bool _disposed;
 
     private PdfRenderer(WinPdfDocument doc, IRandomAccessStream stream)
     {
@@ -73,6 +74,7 @@ public sealed class PdfRenderer : IDisposable
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var page = _doc.GetPage((uint)index);
             var wanted = Math.Max(1, Math.Round(page.Size.Width * dpi / 96.0));
             var wantedHeight = Math.Max(1, Math.Round(page.Size.Height * dpi / 96.0));
@@ -134,9 +136,18 @@ public sealed class PdfRenderer : IDisposable
         return Imaging.ImageIO.Decode(png);
     }
 
+    /// <summary>
+    /// Releases the document once any render in progress has finished; renders asked for later throw
+    /// <see cref="ObjectDisposedException"/>. A viewer can therefore swap renderers while pages are drawing.
+    /// </summary>
     public void Dispose()
     {
-        _stream.Dispose();
-        _gate.Dispose();
+        if (_disposed) return;
+        _disposed = true;
+        _gate.WaitAsync().ContinueWith(_ =>
+        {
+            _stream.Dispose();
+            _gate.Release();
+        }, TaskScheduler.Default);
     }
 }

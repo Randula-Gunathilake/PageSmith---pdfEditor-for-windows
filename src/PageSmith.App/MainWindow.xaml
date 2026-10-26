@@ -2,16 +2,21 @@
     x:Class="PageSmith.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:PageSmith.App.Controls"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Title="PageSmith"
     MinWidth="1000"
     MinHeight="640"
+    AllowDrop="True"
+    DragOver="OnDragOver"
+    Drop="OnDrop"
     ExtendsContentIntoTitleBar="True"
     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
     WindowBackdropType="Mica"
     WindowCornerPreference="Round">
     <Grid x:Name="Root">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -49,9 +54,13 @@
             </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
 
+        <!--  Home and one tab per open document  -->
+        <controls:DocumentTabs x:Name="Tabs" Grid.Row="1" />
+
+        <!--  Home: every tool, workflows and settings  -->
         <ui:NavigationView
             x:Name="Nav"
-            Grid.Row="1"
+            Grid.Row="2"
             FrameMargin="0"
             IsBackButtonVisible="Visible"
             IsPaneToggleVisible="True"
@@ -68,13 +77,22 @@
                     </ui:AutoSuggestBox.Icon>
                 </ui:AutoSuggestBox>
             </ui:NavigationView.AutoSuggestBox>
-            <ui:NavigationView.ContentOverlay>
-                <Grid>
-                    <ui:SnackbarPresenter x:Name="Snackbars" />
-                </Grid>
-            </ui:NavigationView.ContentOverlay>
         </ui:NavigationView>
 
-        <ui:ContentDialogHost x:Name="DialogHost" Grid.Row="0" Grid.RowSpan="2" />
+        <!--  Open documents; only the one whose tab is in front is visible  -->
+        <Grid
+            x:Name="DocumentHost"
+            Grid.Row="2"
+            Visibility="Collapsed" />
+
+        <ui:SnackbarPresenter
+            x:Name="Snackbars"
+            Grid.Row="2"
+            VerticalAlignment="Bottom" />
+
+        <ui:ContentDialogHost
+            x:Name="DialogHost"
+            Grid.Row="0"
+            Grid.RowSpan="3" />
     </Grid>
 </ui:FluentWindow>

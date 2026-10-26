@@ -1,5 +1,10 @@
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Threading;
+using PageSmith.App.Controls;
+using PageSmith.App.Documents;
 using PageSmith.App.Infrastructure;
 using PageSmith.App.Pages;
 using PageSmith.Core.Net;
@@ -10,16 +15,19 @@ namespace PageSmith.App;
 public partial class MainWindow : FluentWindow
 {
     private readonly DispatcherTimer _networkTimer = new() { Interval = TimeSpan.FromSeconds(45) };
+    private readonly Dictionary<DocumentSession, DocumentView> _views = [];
     private bool _online = true;
+    private bool _closeConfirmed;
 
     public MainWindow()
     {
         InitializeComponent();
         WindowSizing.Apply(this, AppServices.Settings.Window);
-        Closing += (_, _) =>
+        Closing += OnClosing;
+        Closed += (_, _) =>
         {
-            AppServices.Settings.Window = WindowSizing.Capture(this);
-            AppServices.SaveSettings();
+            // Working copies live in %TEMP%; remove them now rather than leave them to Windows.
+            foreach (var session in AppServices.Documents.Documents.ToList()) session.Dispose();
         };
         AppServices.Window = this;
         AppServices.Navigation = Nav;
@@ -31,6 +39,14 @@ public partial class MainWindow : FluentWindow
         SearchBox.OriginalItemsSource = ToolRegistry.All.Select(t => t.Title).ToList();
         SearchBox.SuggestionChosen += (_, args) => OpenToolByTitle(args.SelectedItem as string);
         SearchBox.QuerySubmitted += (_, args) => OpenToolByTitle(args.QueryText);
+
+        var workspace = AppServices.Documents;
+        workspace.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DocumentWorkspace.Active)) ShowActive();
+        };
+        workspace.Documents.CollectionChanged += OnDocumentsChanged;
+        PreviewKeyDown += OnPreviewKey;
 
         Loaded += async (_, _) =>
         {
@@ -46,6 +62,120 @@ public partial class MainWindow : FluentWindow
     public bool IsOnline => _online;
 
     public CachingPageProvider PageProvider { get; } = new();
+
+    /// <summary>The view of the document whose tab is in front, or null on Home.</summary>
+    public DocumentView? ActiveView => AppServices.Documents.Active is { } s && _views.TryGetValue(s, out var v) ? v : null;
+
+    // ------------------------------------------------------------------ documents
+
+    /// <summary>Shows Home or the document in front; views are created when first shown and kept while open.</summary>
+    private void ShowActive()
+    {
+        var active = AppServices.Documents.Active;
+        if (active != null && !_views.ContainsKey(active))
+        {
+            var view = new DocumentView(active);
+            _views[active] = view;
+            DocumentHost.Children.Add(view);
+        }
+        foreach (var (session, view) in _views) view.Visibility = session == active ? Visibility.Visible : Visibility.Collapsed;
+        DocumentHost.Visibility = active != null ? Visibility.Visible : Visibility.Collapsed;
+        Nav.Visibility = active == null ? Visibility.Visible : Visibility.Collapsed;
+        UpdateTitle();
+        ActiveView?.Dispatcher.InvokeAsync(() => ActiveView?.FocusView(), DispatcherPriority.Input);
+    }
+
+    private DocumentSession? _titled;
+
+    private void UpdateTitle()
+    {
+        if (_titled != null) _titled.PropertyChanged -= OnActiveSessionChanged;
+        _titled = AppServices.Documents.Active;
+        if (_titled != null) _titled.PropertyChanged += OnActiveSessionChanged;
+        // The taskbar shows which document is in front.
+        Title = _titled == null ? "PageSmith" : $"{(_titled.IsDirty ? "• " : "")}{_titled.Title} - PageSmith";
+    }
+
+    private void OnActiveSessionChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(DocumentSession.Title) or nameof(DocumentSession.IsDirty)) UpdateTitle();
+    }
+
+    private void OnDocumentsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        foreach (var gone in _views.Keys.Where(s => !AppServices.Documents.Documents.Contains(s)).ToList())
+        {
+            var view = _views[gone];
+            view.Detach();
+            DocumentHost.Children.Remove(view);
+            _views.Remove(gone);
+        }
+    }
+
+    private void OnDragOver(object sender, DragEventArgs e)
+    {
+        if (e.Handled) return;
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>Files dropped on a document (not on a tool's file list) open in tabs; Home suggests tools itself.</summary>
+    private async void OnDrop(object sender, DragEventArgs e)
+    {
+        if (e.Handled || AppServices.Documents.Active == null || e.Data.GetData(DataFormats.FileDrop) is not string[] files) return;
+        e.Handled = true;
+        await AppServices.Documents.OpenAsync(files);
+    }
+
+    private async void OnPreviewKey(object sender, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var modifiers = Keyboard.Modifiers;
+        var ctrl = modifiers.HasFlag(ModifierKeys.Control);
+        var workspace = AppServices.Documents;
+        if (ctrl && key == Key.Tab)
+        {
+            workspace.Cycle(modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1);
+        }
+        else if (ctrl && key is Key.PageDown or Key.PageUp)
+        {
+            workspace.Cycle(key == Key.PageDown ? 1 : -1);
+        }
+        else if (ctrl && key == Key.O)
+        {
+            e.Handled = true;
+            await workspace.BrowseAsync();
+            return;
+        }
+        else if (ctrl && key is Key.W or Key.F4 && workspace.Active is { } active)
+        {
+            e.Handled = true;
+            await workspace.CloseAsync(active);
+            return;
+        }
+        else if (ActiveView is not { } view || !view.HandleShortcut(key, modifiers))
+        {
+            return;
+        }
+        e.Handled = true;
+    }
+
+    /// <summary>Offers to save unsaved documents before closing; the window closes once they are dealt with.</summary>
+    private async void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (!_closeConfirmed && AppServices.Documents.Documents.Any(d => d.IsDirty))
+        {
+            e.Cancel = true;
+            if (!await AppServices.Documents.CloseAllAsync()) return;
+            _closeConfirmed = true;
+            Close();
+            return;
+        }
+        AppServices.Settings.Window = WindowSizing.Capture(this);
+        AppServices.SaveSettings();
+    }
+
+    // ------------------------------------------------------------------ Home
 
     private void BuildMenu()
     {

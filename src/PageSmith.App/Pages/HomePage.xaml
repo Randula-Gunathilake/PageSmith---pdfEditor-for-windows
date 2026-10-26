@@ -18,10 +18,111 @@
                 Text="Merge, split, compress, convert, edit, sign and protect PDFs on your PC — free, without limits, and offline."
                 TextWrapping="Wrap" />
 
+            <!--  Open a document, recent documents  -->
+            <Border
+                Margin="0,22,0,0"
+                Padding="20,16"
+                Style="{StaticResource Surface}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="300" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            Text="Open a document" />
+                        <TextBlock
+                            Margin="0,4,0,0"
+                            Style="{StaticResource OptionHint}"
+                            Text="PDFs open in tabs, like in a browser, to read, search, print and change with any tool. Images, Office files and web pages open as new PDFs." />
+                        <ui:Button
+                            Margin="0,10,0,0"
+                            Appearance="Primary"
+                            Click="OnOpenDocument"
+                            Content="Open a file"
+                            ToolTip="Ctrl+O">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="FolderOpen24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="28,0,0,0">
+                        <TextBlock
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            Text="Recent documents" />
+                        <TextBlock
+                            x:Name="NoRecent"
+                            Margin="0,4,0,0"
+                            Style="{StaticResource OptionHint}"
+                            Text="PDFs you open appear here." />
+                        <ItemsControl x:Name="Recent" Margin="0,6,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button
+                                        Width="236"
+                                        Margin="0,0,6,6"
+                                        HorizontalContentAlignment="Stretch"
+                                        Click="OnRecentClick"
+                                        Cursor="Hand"
+                                        Tag="{Binding}"
+                                        ToolTip="{Binding}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border
+                                                    x:Name="Box"
+                                                    Padding="8,6"
+                                                    Background="Transparent"
+                                                    CornerRadius="6">
+                                                    <ContentPresenter />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <ui:SymbolIcon
+                                                FontSize="24"
+                                                Foreground="#E5484D"
+                                                Symbol="DocumentPdf24" />
+                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                <TextBlock
+                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                    Text="{Binding Converter={StaticResource FileName}}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                                <TextBlock
+                                                    FontSize="11.5"
+                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                    Text="{Binding Converter={StaticResource FolderOf}}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
             <!--  Drop strip  -->
             <Border
                 x:Name="DropStrip"
-                Margin="0,22,0,0"
+                Margin="0,14,0,0"
                 Padding="20,16"
                 Style="{StaticResource Surface}">
                 <Grid>
