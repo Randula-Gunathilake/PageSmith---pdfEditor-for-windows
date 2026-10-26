@@ -334,7 +334,7 @@ public sealed partial class SignController() : EditorController("sign")
         await Task.CompletedTask;
     }
 
-    public override void ShowDemoDialog() => _ = SignaturePad.AskAsync("Your signature", SignerName);
+    public override void ShowDemoAlternative() => _ = SignaturePad.AskAsync("Your signature", SignerName);
 
     private static byte[] DemoSignature() => ImageIO.EncodePng(SignaturePad.Trim(RenderText("Ada Lovelace", 110)));
 

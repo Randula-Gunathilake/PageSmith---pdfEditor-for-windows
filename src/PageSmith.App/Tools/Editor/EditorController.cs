@@ -420,15 +420,6 @@ public abstract partial class EditorController : ToolController
 
     protected string OutputFor(string suffix) => OutputFile(Document!.Path, suffix, ".pdf");
 
-    /// <summary>
-    /// Development aid for the --snapshot --demo mode: places sample items through the same entry points
-    /// a user's clicks and drags use, so screenshots and --run exercise the real code paths.
-    /// </summary>
-    public virtual Task SeedDemoAsync() => Task.CompletedTask;
-
-    /// <summary>Development aid for --demo-dialog: opens the tool's main dialog without waiting for it.</summary>
-    public virtual void ShowDemoDialog() { }
-
     /// <summary>Default box size for something placed with a click, centred on the point and kept on the page.</summary>
     protected Rect PlaceBox(int page, Point centre, Size size)
     {

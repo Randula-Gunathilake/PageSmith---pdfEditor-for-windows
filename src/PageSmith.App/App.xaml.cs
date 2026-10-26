@@ -82,11 +82,11 @@ public partial class App : Application
     private async Task SnapshotAsync(MainWindow window, CommandLine args)
     {
         await Task.Delay(args.DelayMs);
-        if (args.Demo && FindToolPage(window)?.Controller is Tools.Editor.EditorController editor)
+        if (args.Demo && FindToolPage(window)?.Controller is { } demo)
         {
-            await editor.SeedDemoAsync();
-            if (args.DemoDialog) editor.ShowDemoDialog();
-            await Task.Delay(1500);
+            await demo.SeedDemoAsync();
+            if (args.DemoAlternative) demo.ShowDemoAlternative();
+            await Task.Delay(args.DemoAlternative ? 4000 : 1500);
         }
         if (args.Run)
         {
@@ -143,7 +143,7 @@ public sealed class CommandLine
     public int DelayMs { get; private set; } = 2500;
     public bool Run { get; private set; }
     public bool Demo { get; private set; }
-    public bool DemoDialog { get; private set; }
+    public bool DemoAlternative { get; private set; }
 
     public static CommandLine Parse(string[] args)
     {
@@ -161,7 +161,7 @@ public sealed class CommandLine
                 case "--delay": c.DelayMs = int.TryParse(Next(), out var d) ? d : c.DelayMs; break;
                 case "--run": c.Run = true; break;
                 case "--demo": c.Demo = true; break;
-                case "--demo-dialog": c.Demo = c.DemoDialog = true; break;
+                case "--demo-alt": c.Demo = c.DemoAlternative = true; break;
                 case "--files": c.Files.AddRange(Next().Split(';', StringSplitOptions.RemoveEmptyEntries)); break;
                 default:
                     if (File.Exists(args[i])) c.Files.Add(Path.GetFullPath(args[i]));
