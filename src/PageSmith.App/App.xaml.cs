@@ -39,6 +39,8 @@ public partial class App : Application
             window.Width = args.Width;
             window.Height = args.Height;
         }
+        // A snapshot run must not take keyboard focus from whatever the user is doing.
+        if (args.Snapshot != null) window.ShowActivated = false;
         window.Show();
 
         window.Dispatcher.InvokeAsync(async () =>
@@ -80,6 +82,12 @@ public partial class App : Application
     private async Task SnapshotAsync(MainWindow window, CommandLine args)
     {
         await Task.Delay(args.DelayMs);
+        if (args.Demo && FindToolPage(window)?.Controller is { } demo)
+        {
+            await demo.SeedDemoAsync();
+            if (args.DemoAlternative) demo.ShowDemoAlternative();
+            await Task.Delay(args.DemoAlternative ? 4000 : 1500);
+        }
         if (args.Run)
         {
             var page = FindToolPage(window);
@@ -134,6 +142,8 @@ public sealed class CommandLine
     public int Height { get; private set; }
     public int DelayMs { get; private set; } = 2500;
     public bool Run { get; private set; }
+    public bool Demo { get; private set; }
+    public bool DemoAlternative { get; private set; }
 
     public static CommandLine Parse(string[] args)
     {
@@ -150,6 +160,8 @@ public sealed class CommandLine
                 case "--height": c.Height = int.TryParse(Next(), out var h) ? h : 0; break;
                 case "--delay": c.DelayMs = int.TryParse(Next(), out var d) ? d : c.DelayMs; break;
                 case "--run": c.Run = true; break;
+                case "--demo": c.Demo = true; break;
+                case "--demo-alt": c.Demo = c.DemoAlternative = true; break;
                 case "--files": c.Files.AddRange(Next().Split(';', StringSplitOptions.RemoveEmptyEntries)); break;
                 default:
                     if (File.Exists(args[i])) c.Files.Add(Path.GetFullPath(args[i]));

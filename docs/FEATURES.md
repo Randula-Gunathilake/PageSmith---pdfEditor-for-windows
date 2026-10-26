@@ -115,27 +115,27 @@ batch limits other than the machine's memory. Everything runs locally unless the
 | Tool | PageSmith implementation | Network |
 |---|---|---|
 | Merge, Split (range, fixed, pages, **size**, smart), Remove, Extract, Organize | PDFsharp page import; size split searches for the largest page run that fits; smart split uses bookmarks and blank separator pages (v1), text segmentation (v2) | Offline |
-| Scan to PDF | Windows Image Acquisition scanner dialog, webcam capture (Windows.Media.Capture), photo import; v2 adds document edge detection, perspective correction and deskew | Offline |
+| Scan to PDF | Windows Image Acquisition scanner dialog, camera window with live preview (Windows.Media.Capture), photo import; colour, greyscale or black & white clean-up (adaptive threshold that removes shadows); v2 adds document edge detection, perspective correction and deskew | Offline |
 | Compress | Re-encodes and downsamples JPEG and Flate images, recompresses streams, removes unused objects; three levels | Offline |
 | Repair | PDFsharp rebuild → PdfPig lenient rebuild → rasterized rebuild | Offline |
 | OCR | Windows.Media.Ocr (on-device recognition) with invisible text layer; all installed Windows OCR languages | Offline |
 | Images to PDF | JPG, PNG, BMP, GIF, TIFF (multi-page), orientation, size, margin, merge | Offline |
 | Word / PowerPoint / Excel to PDF | Microsoft Office (COM) → LibreOffice → built-in OpenXML renderer | Offline |
-| HTML to PDF | Microsoft Edge WebView2 print engine; local files and HTML offline, URLs **online** | Online for URLs |
+| HTML to PDF | Hidden Microsoft Edge WebView2: screen width 320–1920 px, A4/A3/A5/Letter/one long page, orientation, margins, ad blocking, pop-up and cookie-banner removal, preview; local HTML files offline, web addresses **online** with *Retry* | Online for URLs |
 | PDF to JPG | Windows.Data.Pdf rendering (JPG/PNG/TIFF/BMP), embedded image extraction | Offline |
 | PDF to Word | Microsoft Word PDF reflow, or built-in layout reconstruction (OpenXML); optional OCR | Offline |
 | PDF to PowerPoint | Slide per page (exact image or editable text boxes) | Offline |
 | PDF to Excel | Table reconstruction from word positions; one sheet or sheet per page; optional OCR | Offline |
 | PDF to PDF/A | All 8 conformance levels: XMP metadata, sRGB output intent, encryption/JS removal, optional rasterization of pages with non-embedded fonts | Offline |
 | PDF to Markdown | Headings by font size, lists, tables, links | Offline |
-| Rotate, Page numbers, Watermark, Crop | Full option sets listed above, live preview | Offline |
-| Edit PDF | Page editor: text, images, rectangles, ellipses, lines, freehand ink, white-out | Offline |
-| PDF Forms | Fill AcroForm fields; create text/checkbox/choice/list fields; auto-detect blanks | Offline |
+| Rotate, Page numbers, Watermark, Crop | Full option sets listed above; Crop uses a draggable frame on the page with *Fit to content* | Offline |
+| Edit PDF | Page editor: text, images, rectangles, ellipses, lines, arrows, freehand ink, white-out; **edit existing text** covers a line with its paper colour and rewrites it in a matching font | Offline |
+| PDF Forms | Fill AcroForm fields in place; create text/checkbox/radio/dropdown/list fields; auto-detect blanks; flatten | Offline |
 | Unlock / Protect | AES-256 / AES-128 / RC4 encryption, all permission flags; owner-restriction removal | Offline |
-| Sign | Drawn, typed or image signatures, initials, name, date, text, stamp; **digital signature** with a Windows certificate store or PFX certificate | Offline |
-| Redact | Area and search redaction, presets (email, phone, card, SSN, IBAN, URL, IP, dates); redacted pages are rasterized so the content is gone | Offline |
-| Compare | Word-level text diff with change report, visual overlay diff | Offline |
-| Summarizer | Extractive summary (v1 frequency scoring, v2 TextRank + embeddings); optional Claude summaries | Offline / online for Claude |
+| Sign | Signature pad (draw, type in a handwriting font, upload with background removal); initials, name, date, text, stamp; **digital signature** with a certificate from Windows, a PFX file or a new self-signed one, optional trusted timestamp (online). Requesting signatures from others is not included (needs an online service) | Offline |
+| Redact | Areas, clicked words, search (case, whole word, regex) and presets (email, phone, card with Luhn check, SSN, IBAN, URL, IP, dates) with a review list; redacted pages are rasterized so the content is gone | Offline |
+| Compare | Side-by-side view with word-level highlights and a change list, visual overlay; writes highlighted copies and a change report | Offline |
+| Summarizer | On-device extractive summary and keywords (v1 frequency scoring, v2 TextRank + embeddings). A Claude engine exists in PageSmith.Core but is not offered in the app | Offline |
 | Translate | Layout-preserving translation through MyMemory, LibreTranslate or Claude | **Online** |
 | Workflows | Reusable chains of tools with saved options, run on many files | Offline |
 | Continue with another tool | Every result can be passed into the next tool | – |

@@ -97,8 +97,8 @@ public static class ToolRegistry
         _ => SymbolRegular.Sparkle24,
     };
 
-    /// <summary>Tools still on placeholder controllers (see PendingControllers.cs and TODO.md).</summary>
-    public static readonly HashSet<string> InProgressIds = ["scan", "html-to-pdf", "crop", "edit", "forms", "sign", "redact", "compare"];
+    /// <summary>Tools whose screens are still being built (none at the moment); they show an "In progress" chip.</summary>
+    public static readonly HashSet<string> InProgressIds = [];
 
     private const string Red = "#E5484D", Green = "#46A758", Blue = "#3E63DD", Purple = "#8E4EC6", Orange = "#F76B15", Teal = "#12A594", Gold = "#D9A400", Indigo = "#6E56CF";
 
@@ -160,7 +160,7 @@ public static class ToolRegistry
 
         // Intelligence
         new("summarize", "AI Summarizer", "Get a concise summary and key points of any PDF.", ToolCategory.Intelligence, SymbolRegular.Sparkle24, Indigo, "Summarize", InputKind.Pdf, false, () => new SummarizeController())
-            { OnlineNote = "Works offline; Claude summaries need the internet.", ILovePdfTier = "Free (25,000 words) · AI credits" },
+            { ILovePdfTier = "Free (25,000 words) · AI credits" },
         new("translate", "Translate PDF", "Translate PDFs while keeping the layout.", ToolCategory.Intelligence, SymbolRegular.Translate24, Indigo, "Translate", InputKind.Pdf, false, () => new TranslateController())
             { OnlineNote = "Translation services need the internet.", ILovePdfTier = "Free (30 pages) · AI credits" },
     ];

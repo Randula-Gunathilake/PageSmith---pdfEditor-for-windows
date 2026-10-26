@@ -47,6 +47,7 @@ public static class SignTool
             var scope = new ProgressScope(progress);
             var result = new ToolResult { InputBytes = new FileInfo(options.Input.Path).Length };
             using var doc = PdfDocs.Open(options.Input);
+            using var signedBuffer = new MemoryStream();
             if (options.Elements.Count > 0) EditPdfTool.Apply(doc, options.Elements, scope.Slice(0, 0.5), ct);
 
             if (options.Digital is { } d)
@@ -56,7 +57,7 @@ public static class SignTool
                 scope.Report(0.6, "Applying digital signature");
                 var page = doc.Pages[d.PageIndex];
                 var geometry = PageGeometry.From(page);
-                var signer = new PdfSharpDefaultSigner(d.Certificate, PdfMessageDigestType.SHA256, d.TimestampServer!);
+                var signer = new PrintableWidgetSigner(new PdfSharpDefaultSigner(d.Certificate, PdfMessageDigestType.SHA256, d.TimestampServer!), signedBuffer);
                 var visible = !d.Bounds.IsEmpty && d.Bounds.Width > 1;
                 // PDFsharp expects the widget rectangle in PDF user space.
                 var user = visible ? geometry.ToUser(d.Bounds) : new Rect(0, 0, 0, 0);
@@ -79,7 +80,18 @@ public static class SignTool
             }
 
             scope.Report(0.9, "Saving");
-            PdfDocs.Save(doc, options.OutputPath);
+            if (options.Digital != null)
+            {
+                // Signed documents are written to memory first so PrintableWidgetSigner can see the bytes.
+                doc.Info.Creator = string.IsNullOrEmpty(doc.Info.Creator) ? "PageSmith" : doc.Info.Creator;
+                doc.Save(signedBuffer, false);
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.OutputPath))!);
+                File.WriteAllBytes(options.OutputPath, signedBuffer.ToArray());
+            }
+            else
+            {
+                PdfDocs.Save(doc, options.OutputPath);
+            }
             result.AddOutput(options.OutputPath);
             if (doc.Tag as string == PdfDocs.DecryptedCopyTag)
                 result.Warnings.Add("The original password protection was removed; use Protect PDF before signing if it must stay encrypted.");
@@ -93,7 +105,8 @@ public static class SignTool
         public void DrawAppearance(XGraphics gfx, XRect rect)
         {
             var state = gfx.Save();
-            var box = rect;
+            // The appearance is a form XObject whose box starts at (0, 0); rect only gives its size.
+            var box = new XRect(0, 0, rect.Width, rect.Height);
             if (pageRotation is 90 or 270)
             {
                 // Keep the appearance upright on rotated pages.
@@ -123,8 +136,12 @@ public static class SignTool
                 gfx.DrawImage(image, box.X + (imageWidth - w) / 2, box.Y + (box.Height - h) / 2, w, h);
                 textBox = new XRect(box.X + imageWidth + 4, box.Y, Math.Max(1, box.Width - imageWidth - 4), box.Height);
             }
+            var options = new XPdfFontOptions(PdfSharp.Pdf.PdfFontEncoding.Unicode);
             var size = Math.Clamp(textBox.Height / (lines.Count * 1.3), 4, 10);
-            var font = new XFont("Arial", size, XFontStyleEx.Regular, new XPdfFontOptions(PdfSharp.Pdf.PdfFontEncoding.Unicode));
+            // Shrink further when the longest line would not fit the width.
+            var widest = lines.Max(l => gfx.MeasureString(l, new XFont("Arial", size, XFontStyleEx.Regular, options)).Width);
+            if (widest > textBox.Width - 2) size = Math.Max(3, size * (textBox.Width - 2) / widest);
+            var font = new XFont("Arial", size, XFontStyleEx.Regular, options);
             var y = textBox.Y + (textBox.Height - lines.Count * size * 1.25) / 2;
             foreach (var line in lines)
             {
@@ -132,6 +149,40 @@ public static class SignTool
                 y += size * 1.25;
             }
             gfx.Restore(state);
+        }
+    }
+
+    /// <summary>
+    /// PDFsharp writes the signature widget without annotation flags, so viewers that draw only printable
+    /// annotations (including Windows' PDF engine) hide the visible signature, and it doesn't print. The widget
+    /// is built inside PDFsharp's save, out of reach, so the flag is set in the written bytes instead: the
+    /// widget's empty default-resources entry "/DR&lt;&lt;&gt;&gt;" (meaningless on a signature) is overwritten with an
+    /// equally long "/F 4". This happens when PDFsharp asks for the signature, before the signed byte ranges
+    /// are hashed, so the signature covers the change and offsets stay valid.
+    /// </summary>
+    private sealed class PrintableWidgetSigner(IDigitalSigner inner, MemoryStream output) : IDigitalSigner
+    {
+        private static readonly byte[] Widget = Encoding.ASCII.GetBytes("/FT/Sig");
+        private static readonly byte[] EmptyResources = Encoding.ASCII.GetBytes("/DR<<>>");
+        private static readonly byte[] PrintFlag = Encoding.ASCII.GetBytes("/F 4   ");
+
+        public string CertificateName => inner.CertificateName;
+
+        public Task<int> GetSignatureSizeAsync() => inner.GetSignatureSizeAsync();
+
+        public Task<byte[]> GetSignatureAsync(Stream stream)
+        {
+            var bytes = output.GetBuffer().AsSpan(0, (int)output.Length);
+            for (var at = bytes.IndexOf(Widget); at >= 0;)
+            {
+                // The keys of one dictionary are written together; look a short way ahead only.
+                var window = bytes.Slice(at, Math.Min(400, bytes.Length - at));
+                var dr = window.IndexOf(EmptyResources);
+                if (dr >= 0 && window[..dr].IndexOf((byte)'>') < 0) PrintFlag.CopyTo(window[dr..]);
+                var next = bytes[(at + 1)..].IndexOf(Widget);
+                at = next < 0 ? -1 : at + 1 + next;
+            }
+            return inner.GetSignatureAsync(stream);
         }
     }
 }

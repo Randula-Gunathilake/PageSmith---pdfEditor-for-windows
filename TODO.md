@@ -10,7 +10,7 @@ Free and Premium tiers, as an offline desktop app. This file tracks:
 For the iLovePDF research behind the feature list (plans, every tool's options, the Free vs
 Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 
-**Current version:** 0.1.0 (preview), last updated 2026-10-25.
+**Current version:** 0.2.0 (preview), last updated 2026-10-26.
 
 ---
 
@@ -19,61 +19,62 @@ Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 | Area | State |
 |---|---|
 | iLovePDF analysis | Done: 34 features (33 tools + Workflows), Free vs Premium limits, mapping → [docs/FEATURES.md](docs/FEATURES.md) |
-| PDF engine (`PageSmith.Core`) | Done for 31 of 33 tools; 80 automated tests, all passing |
-| Windows app (`PageSmith.App`) | 25 of 33 tool screens working, plus Home, Workflows, Settings and About |
-| Still to build | 8 interactive screens: Crop, Edit, Forms, Sign, Redact, Compare, Scan, HTML to PDF |
-| Machine-learning features | Planned for v2.0 (section 4) |
+| PDF engine (`PageSmith.Core`) | Done for all 33 tools; 82 automated tests, all passing |
+| Windows app (`PageSmith.App`) | **All 33 tool screens working**, plus Home, Workflows, Settings and About |
+| Still to check by hand | A real scanner, a real camera, and *Retry* with the PC actually offline (§2.1) |
+| Machine-learning features | Planned for v2.0 (§4) |
 | Packaging | Self-contained single-file `.exe` and zip via `scripts/publish.ps1`; no installer yet |
 
-Legend for the tables below:
+How the tools were checked:
 
-- ✅ **Working.** The screen and engine are done and you can use the tool today.
-- 🟡 **Engine ready.** The engine is written and tested, but the interactive screen is not built yet.
-  The tool page shows an *In progress* chip, and pressing its button explains it is coming.
-- ⬜ **Not started.**
-
-"UI run" means the tool was driven through the real app window: files were loaded, the button
-was pressed, and the output file was checked. "Unit tests" means the engine is covered by
-`tests/PageSmith.Tests`.
+- **UI run** means the tool was driven through the real app window: files loaded, items placed
+  on the page where the tool needs them, the button pressed, and the output file opened and
+  looked at.
+- **Unit tests** means the engine is covered by `tests/PageSmith.Tests`.
+- Page-editor tools were driven with the `--demo` switch, which places items through the same
+  code paths as mouse clicks (see §5.6). Mouse dragging itself was not automated.
 
 ### 1.1 Tools
 
-| # | Tool | Status | Network | iLovePDF tier → PageSmith | Verified by |
-|---|---|---|---|---|---|
-| 1 | Merge PDF | ✅ | Offline | Free (25 files) → unlimited; bookmarks per file, per-file rotation, sort | Unit tests, screen check |
-| 2 | Split PDF | ✅ | Offline | Custom/fixed ranges, extract all/select, **split by size** and **smart split** (Premium) included | Unit tests, UI run |
-| 3 | Remove pages | ✅ | Offline | Free | Unit tests |
-| 4 | Extract pages | ✅ | Offline | Free | Unit tests |
-| 5 | Organize PDF | ✅ | Offline | Reorder, rotate, delete, duplicate, insert blank, add more PDFs | Unit tests, screen check |
-| 6 | Scan to PDF | ⬜ | Offline | Scanner and camera capture still to build. Photos can already go through *JPG to PDF* | — |
-| 7 | Compress PDF | ✅ | Offline | Extreme / Recommended / Less; never makes a file bigger | Unit tests, UI run |
-| 8 | Repair PDF | ✅ | Offline | Three-stage recovery (rebuild → lenient parse → re-render) | Unit tests |
-| 9 | OCR PDF | ✅ | Offline | Free 50 pages → unlimited; any OCR language installed in Windows | Unit tests |
-| 10 | JPG to PDF | ✅ | Offline | JPG/PNG/BMP/GIF/TIFF, orientation, page size, margins, EXIF rotation | Unit tests, UI run |
-| 11 | Word to PDF | ✅ | Offline | Microsoft Office → LibreOffice → built-in converter | Unit tests |
-| 12 | PowerPoint to PDF | ✅ | Offline | Same engines as Word to PDF | Unit tests |
-| 13 | Excel to PDF | ✅ | Offline | Same engines as Word to PDF | Unit tests |
-| 14 | HTML to PDF | ⬜ | Online for URLs | WebView2 capture still to build (the package is already referenced) | — |
-| 15 | PDF to JPG | ✅ | Offline | Page → JPG/PNG/TIFF/BMP or extract embedded images; Normal/High/custom DPI | Unit tests, UI run |
-| 16 | PDF to Word | ✅ | Offline | Built-in layout reconstruction, or Microsoft Word; **OCR for scans** (Premium) included | Unit tests, UI run |
-| 17 | PDF to PowerPoint | ✅ | Offline | Slide per page, picture or editable text; **OCR** included | Unit tests |
-| 18 | PDF to Excel | ✅ | Offline | Table reconstruction, typed numbers; one sheet or sheet per page; **OCR** included | Unit tests |
-| 19 | PDF to PDF/A | ✅ | Offline | **All 8 conformance levels** (Premium on iLovePDF) | Unit tests |
-| 20 | PDF to Markdown | ✅ | Offline | Headings, lists, tables, links | Unit tests, UI run |
-| 21 | Rotate PDF | ✅ | Offline | Whole files or single pages; all/portrait/landscape filter | Unit tests |
-| 22 | Add page numbers | ✅ | Offline | 9 positions, facing pages, cover page, templates `{n}` `{p}`, font/size/colour | Unit tests, UI run |
-| 23 | Add watermark | ✅ | Offline | Text or image, mosaic, transparency, rotation, layer, page range | Unit tests, UI run |
-| 24 | Crop PDF | 🟡 | Offline | Engine: crop area plus auto-detect content margins | Unit tests |
-| 25 | Edit PDF | 🟡 | Offline | Engine: text, images, shapes, arrows, ink, white-out | Unit tests |
-| 26 | PDF Forms | 🟡 | Offline | Engine: read, fill, flatten, create fields, detect blanks/boxes | Unit tests |
-| 27 | Unlock PDF | ✅ | Offline | Removes open passwords and owner restrictions | Unit tests |
-| 28 | Protect PDF | ✅ | Offline | AES-256/AES-128/RC4, every permission flag, password strength meter | Unit tests, UI run (validation) |
-| 29 | Sign PDF | 🟡 | Offline | Engine: visual signatures plus **certificate digital signatures** (store, PFX, self-signed) | Unit tests (signature verifies) |
-| 30 | Redact PDF | 🟡 | Offline | Engine: area and search redaction, presets (email, phone, card with Luhn, SSN, IBAN, URL, IP, dates) | Unit tests |
-| 31 | Compare PDF | 🟡 | Offline | Engine: word-level diff report, highlighted copies, overlay | Unit tests |
-| 32 | AI Summarizer | ✅ | Offline (Claude optional, online) | Offline extractive summary; optional Claude summaries with your API key | Unit tests, UI run (offline) |
-| 33 | Translate PDF | ✅ | **Online** | MyMemory (free), LibreTranslate or Claude; layout kept | Unit tests (engine); online services not exercised in tests |
-| 34 | Workflows | ✅ | Offline | **Premium-only on iLovePDF**: 3 presets plus your own chains of 14 step types | Unit tests, screen check |
+| # | Tool | Network | iLovePDF tier → PageSmith | Verified by |
+|---|---|---|---|---|
+| 1 | Merge PDF | Offline | Free (25 files) → unlimited; bookmarks per file, per-file rotation, sort | Unit tests, screen check |
+| 2 | Split PDF | Offline | Custom/fixed ranges, extract all/select, **split by size** and **smart split** (Premium) included | Unit tests, UI run |
+| 3 | Remove pages | Offline | Free | Unit tests |
+| 4 | Extract pages | Offline | Free | Unit tests |
+| 5 | Organize PDF | Offline | Reorder, rotate, delete, duplicate, insert blank, add more PDFs | Unit tests, screen check |
+| 6 | Scan to PDF | Offline | Scanner (Windows scan dialog), camera with live preview, or photos; colour, greyscale or black & white clean-up; page size, orientation, margin | Unit tests (filters), UI run with a photo |
+| 7 | Compress PDF | Offline | Extreme / Recommended / Less; never makes a file bigger | Unit tests, UI run |
+| 8 | Repair PDF | Offline | Three-stage recovery (rebuild → lenient parse → re-render) | Unit tests |
+| 9 | OCR PDF | Offline | Free 50 pages → unlimited; any OCR language installed in Windows | Unit tests |
+| 10 | JPG to PDF | Offline | JPG/PNG/BMP/GIF/TIFF, orientation, page size, margins, EXIF rotation | Unit tests, UI run |
+| 11 | Word to PDF | Offline | Microsoft Office → LibreOffice → built-in converter | Unit tests |
+| 12 | PowerPoint to PDF | Offline | Same engines as Word to PDF | Unit tests |
+| 13 | Excel to PDF | Offline | Same engines as Word to PDF | Unit tests |
+| 14 | HTML to PDF | Online for web addresses | Screen width 320–1920 px, A4/A3/A5/Letter/one long page, orientation, margins, block ads, remove pop-ups and cookie banners; local HTML files offline | UI run (local file and example.com) |
+| 15 | PDF to JPG | Offline | Page → JPG/PNG/TIFF/BMP or extract embedded images; Normal/High/custom DPI | Unit tests, UI run |
+| 16 | PDF to Word | Offline | Built-in layout reconstruction, or Microsoft Word; **OCR for scans** (Premium) included | Unit tests, UI run |
+| 17 | PDF to PowerPoint | Offline | Slide per page, picture or editable text; **OCR** included | Unit tests, screen check |
+| 18 | PDF to Excel | Offline | Table reconstruction, typed numbers; one sheet or sheet per page; **OCR** included | Unit tests |
+| 19 | PDF to PDF/A | Offline | **All 8 conformance levels** (Premium on iLovePDF) | Unit tests |
+| 20 | PDF to Markdown | Offline | Headings, lists, tables, links | Unit tests, UI run |
+| 21 | Rotate PDF | Offline | Whole files or single pages; all/portrait/landscape filter | Unit tests |
+| 22 | Add page numbers | Offline | 9 positions, facing pages, cover page, templates `{n}` `{p}`, font/size/colour | Unit tests, UI run |
+| 23 | Add watermark | Offline | Text or image, mosaic, transparency, rotation, layer, page range | Unit tests, UI run |
+| 24 | Crop PDF | Offline | Drag a frame on the page, *Fit to content*, all pages or this page | Unit tests, UI run |
+| 25 | Edit PDF | Offline | Text, images, rectangles, ellipses, lines, arrows, freehand, white-out, and **editing existing text** (Premium) | Unit tests, UI run |
+| 26 | PDF Forms | Offline | Fill fields in place, create text/checkbox/radio/dropdown/list fields, *Detect fields*, flatten | Unit tests, UI run (fill and create) |
+| 27 | Unlock PDF | Offline | Removes open passwords and owner restrictions | Unit tests |
+| 28 | Protect PDF | Offline | AES-256/AES-128/RC4, every permission flag, password strength meter | Unit tests, UI run (validation) |
+| 29 | Sign PDF | Offline (timestamp online) | Draw, type or upload a signature; initials, name, date, text, stamp; **certificate digital signatures** from Windows, a .pfx file or a new self-signed one | Unit tests (signature verifies and is visible), UI run |
+| 30 | Redact PDF | Offline | Areas, words, search (match case, whole words, regex) and patterns: email, phone, card numbers with Luhn check, SSN, IBAN, IP, web addresses, dates | Unit tests, UI run |
+| 31 | Compare PDF | Offline | Side by side with highlighted changes, change list that jumps to each change, visual overlay; report and highlighted copies | Unit tests, UI run |
+| 32 | AI Summarizer | Offline | On-device extractive summary and keywords as Markdown, PDF or text | Unit tests, UI run |
+| 33 | Translate PDF | **Online** | MyMemory (free), LibreTranslate or Claude; layout kept | Unit tests (engine); online services not exercised in tests |
+| 34 | Workflows | Offline | **Premium-only on iLovePDF**: 3 presets plus your own chains of 14 step types | Unit tests, screen check |
+
+Not included: iLovePDF's *request signatures from other people*. It needs an online service
+that sends emails and stores documents, which goes against PageSmith running on your PC.
 
 ### 1.2 Things that work across the app
 
@@ -86,39 +87,60 @@ was pressed, and the output file was checked. "Unit tests" means the engine is c
 - **Files.**
   - Drag and drop, file cards with thumbnails, drag to reorder.
   - Page grid with Shift-select, zoom slider and per-page actions.
-- **Passwords.** An encrypted PDF shows a lock on its card that you click to enter the password,
-  and a tool asks for it when it runs. Restriction-only PDFs just work.
+- **Page editor** (Crop, Edit, Forms, Sign, Redact):
+  - zoom (Ctrl + mouse wheel, Ctrl +/−) and a page thumbnail strip;
+  - select, move and resize with handles;
+  - undo and redo (Ctrl+Z, Ctrl+Y);
+  - arrow keys to nudge, Delete to remove, Page Up/Down to change page.
+- **Passwords.** An encrypted PDF shows a lock on its card that you click to enter the password;
+  editors and tools ask for it when they open or run. Restriction-only PDFs just work.
 - **Results.**
   - Open the file, show it in its folder, copy text output.
   - *Continue with…* sends the result straight into another tool.
 - **Offline-first.**
   - The title bar shows *Online*/*Offline*, rechecked every 45 s and on network changes.
-  - Online features show a *You're offline* bar with **Retry** and **Network settings** instead of failing.
+  - Online features (web pages, translation, signature timestamps) show a *You're offline* bar
+    with **Retry** and **Network settings** instead of failing.
 - **Settings**, saved in `%APPDATA%\PageSmith\settings.json`:
   - theme;
   - where to save (next to the original, a fixed folder, or ask);
   - Office engine;
   - OCR language;
   - translation service;
-  - Claude API key, encrypted with Windows DPAPI.
+  - Claude API key for translation, encrypted with Windows DPAPI.
 - **About** shows the iLovePDF Free vs Premium catalog next to what PageSmith includes.
 - **Command line.** `PageSmith.exe file.pdf` opens the right tool. Developer options are in §5.6.
 - **Errors** are logged to `%APPDATA%\PageSmith\pagesmith.log` and shown in-app, never as crash dialogs.
 
-### 1.3 Known issues
+### 1.3 Fixed since 0.1.0
+
+- **Option panels.** PDF to PowerPoint, PDF to Excel and Add watermark referenced a style that
+  didn't exist, so their option panels failed to load.
+- **Visible digital signature.** It was drawn outside its own box, so it was invisible in every
+  PDF viewer. It now shows and prints, and the signature still verifies.
+- **Dropdowns.** A filled dropdown now shows its value in Windows' built-in PDF viewer too.
+- **Dark mode.** Titles and file names on tool pages were dark on dark.
+- **AI Summarizer** is now offline-only in the app. The Claude engine (`SummaryEngine.Claude`,
+  `ClaudeService`) is still in `PageSmith.Core`, untouched, for a future online option.
+
+### 1.4 Known issues
 
 - **Slow first thumbnail.** The first thumbnail after start-up can take a few seconds while the
-  Windows PDF renderer warms up.
+  Windows PDF renderer warms up. Compare's *Visual overlay* takes a few seconds the first time
+  for the same reason.
 - **Microsoft Office automation can stall** on some documents. PageSmith then kills only the
   Office processes it started (after 3 minutes) and, in *Automatic* mode, falls back to the
   built-in converter. PDF to Word uses the built-in converter by default for this reason.
+- **Editing existing text** covers the old line with the paper colour and writes new text on top.
+  It doesn't change the text inside the PDF's content. If the PDF's font isn't installed in
+  Windows, a similar standard font is used.
+- **HTML to PDF** opens pages in its own private browser profile, so pages that need you to be
+  signed in show their signed-out version.
 - **Offline summarizer quality.** It sometimes picks table header rows as sentences, and counts
   "com" from e-mail addresses as a keyword.
-- **Workflows that include Redact or Crop** call the engines directly with saved options. They
-  are not blocked by the unfinished screens, but you can't preview the areas yet.
-- **Compiler warnings.** A Release build shows 8 warnings: nullability in `MicrosoftOffice.cs`
-  and `WordDiff.cs`, and obsolete PdfPig/PDFsharp APIs. They are harmless but should be
-  cleaned up.
+- **Compiler warnings.** A Release build shows about 8 warnings: nullability in
+  `MicrosoftOffice.cs` and `WordDiff.cs`, and obsolete PdfPig/PDFsharp APIs. They are harmless
+  but should be cleaned up.
 - **No installer or code signing yet.** Windows SmartScreen may warn the first time you run a
   downloaded `PageSmith.exe`.
 
@@ -128,63 +150,27 @@ was pressed, and the output file was checked. "Unit tests" means the engine is c
 
 Work happens on `feature/*` branches cut from `develop` (see §6).
 
-### 2.1 The eight remaining screens (`feature/ui-tools`)
+### 2.1 Checks that need real hardware or a real network change
 
-- [ ] **PageEditor control**, shared by Crop, Edit, Forms, Sign and Redact. It needs:
-  - a page view with zoom and page navigation;
-  - a thumbnail strip;
-  - an overlay layer to select, move, resize, delete and reorder elements;
-  - undo/redo.
-- [ ] **Crop:**
-  - drag a crop box on the page, for all pages or just this page;
-  - an *Auto-detect* button that uses `CropTool.DetectContentAsync`.
-- [ ] **Edit PDF:** tools for text, image, rectangle, ellipse, line, arrow, freehand ink and
-  white-out, plus a properties panel. The engine is `EditPdfTool`.
-- [ ] **PDF Forms:**
-  - fill existing fields in place;
-  - create text, checkbox, choice and list fields;
-  - *Detect fields*;
-  - *Flatten*.
-  The engine is `FormsTool`.
-- [ ] **Sign:**
-  - a signature dialog to draw, type or upload a signature;
-  - initials, name, date, text and company stamp;
-  - digital signing with a certificate from the Windows store, a PFX file, or a new
-    self-signed one.
-  The engines are `SignTool` and `Certificates`.
-- [ ] **Redact:**
-  - draw areas, search text, and apply pattern presets;
-  - a review list before applying.
-  The engine is `RedactTool`.
-- [ ] **Compare:**
-  - a side-by-side viewer with synced scrolling, highlights and a change list;
-  - overlay mode.
-  The engine is `CompareTool`.
-- [ ] **Scan to PDF:**
-  - a scanner dialog through Windows Image Acquisition (`WIA.CommonDialog`);
-  - webcam capture (`Windows.Media.Capture`);
-  - photo import.
-  All three then reuse `ImagesToPdfTool`.
-- [ ] **HTML to PDF:**
-  - a hidden WebView2 that loads the page, then `PrintToPdfAsync`;
-  - options: screen width (320–1920 px), page size (A3/A4/A5/Letter/one long page),
-    orientation, margins, block ads, remove pop-ups;
-  - URLs check `Connectivity` first and show *Retry* when offline;
-  - local `.html` files work offline.
-- [ ] As each screen lands, remove its id from `ToolRegistry.InProgressIds` and its stub from
-  `src/PageSmith.App/Tools/PendingControllers.cs`.
+- [ ] **Scanner:** scan through *Scan to PDF → Scanner* with a real scanner (flatbed and feeder).
+  Also check the messages when no scanner is connected.
+- [ ] **Camera:** take photos in *Scan to PDF → Camera* with a webcam. Also check the message
+  when Windows blocks camera access (*Settings → Privacy & security → Camera*).
+- [ ] **Offline Retry:** with Wi-Fi off, check that HTML to PDF (web address), Translate and Sign
+  (with a timestamp) show the offline bar, and that **Retry** works once back online.
+- [ ] **Mouse and pen:** in every page-editor tool, check drawing, moving and resizing with mouse,
+  touch and pen.
 
 ### 2.2 Quality and release
 
-- [ ] Drive every tool through the UI in light and dark mode. Include password-protected
-  inputs, big files (500+ pages), and offline mode for Translate, HTML to PDF and Claude.
-- [ ] Summarizer polish: skip table-like lines; strip e-mail addresses and URLs before
-  keyword scoring.
+- [ ] Drive every tool through the UI in light and dark mode. Include password-protected inputs
+  and big files (500+ pages).
+- [ ] Summarizer polish: skip table-like lines; strip e-mail addresses and URLs before keyword
+  scoring.
 - [ ] Fix the Release-build warnings.
 - [ ] Accessibility pass: keyboard navigation through every screen, automation names for
   icon-only buttons, high-contrast theme check.
-- [ ] Update `README.md` and `docs/FEATURES.md` §4 to match the final implementation; add
-  screenshots.
+- [ ] Add screenshots to `README.md`.
 - [ ] Release:
   1. Set `<Version>1.0.0</Version>` in `Directory.Build.props`.
   2. Create `release/1.0.0` from `develop`.
@@ -223,9 +209,9 @@ downloaded, PageSmith asks first, checks the connection, and offers *Retry* if o
 
 - [ ] **Auto-orientation and deskew** for scans and OCR, using the Windows OCR text angle plus
   a projection-profile fallback.
-- [ ] **Smart scan:**
-  - document edge detection and perspective correction;
-  - shadow and contrast clean-up.
+- [ ] **Smart scan:** document edge detection and perspective correction for camera photos. This
+  builds on `PageSmith.Core/Imaging/DocumentFilters.cs`, which already has the shadow-removing
+  black & white filter.
 - [ ] **Better summaries:** TextRank over sentence embeddings, using a MiniLM ONNX model through
   ONNX Runtime, downloaded on first use.
 - [ ] **PII detection for Redact:** names, addresses and ID numbers beyond the regex presets
@@ -255,11 +241,13 @@ Optional components the app uses at run time if they are present:
 
 | Component | Used for | If missing |
 |---|---|---|
-| Microsoft Edge WebView2 Runtime | HTML to PDF (v1.0) | Preinstalled on Windows 11; on Windows 10 install the Evergreen runtime from Microsoft. |
+| Microsoft Edge WebView2 Runtime | HTML to PDF | Preinstalled on Windows 11. On Windows 10 install the Evergreen runtime from Microsoft; the app explains this if it's missing. |
+| A scanner with a WIA driver | Scan to PDF → Scanner | Most scanners install one. Without a scanner, use the camera or photos. |
+| A camera, with *Let desktop apps access your camera* on | Scan to PDF → Camera | The camera window explains how to allow access. |
 | Microsoft Office (Word, Excel, PowerPoint) | Best-fidelity Office → PDF, optional Word reflow for PDF → Word | LibreOffice is used if installed; otherwise the built-in converter. |
 | LibreOffice | Office → PDF when Office isn't installed | Built-in converter. |
 | Windows OCR languages | OCR PDF, OCR in PDF → Office | The English OCR pack ships with English Windows. Add more in **Settings → Time & language → Language & region → Add a language**. Or, in an admin PowerShell: `Get-WindowsCapability -Online \| Where-Object Name -like 'Language.OCR*'`, then `Add-WindowsCapability -Online -Name "Language.OCR~~~fr-FR~0.0.1.0"`. |
-| Anthropic API key | Optional Claude summaries and translation | Paste it in **Settings → AI services**, or set the `ANTHROPIC_API_KEY` environment variable. Everything else works without it. |
+| Anthropic API key | Optional Claude translation | Paste it in **Settings → AI services**, or set the `ANTHROPIC_API_KEY` environment variable. Everything else works without it. |
 
 ### 5.2 Get the code
 
@@ -271,7 +259,7 @@ git clone https://github.com/Randula-Gunathilake/PageSmith---pdfEditor-for-windo
 cd PageSmith
 ```
 
-- `main` holds released versions; this one is tagged `v0.1.0`.
+- `main` holds released versions; the newest is tagged `v0.2.0`.
 - `develop` has the latest integrated work.
 
 To build the newest code:
@@ -315,8 +303,9 @@ dotnet run --project src/PageSmith.App
 dotnet test tests/PageSmith.Tests
 ```
 
-- **80 tests, about 30 seconds.** They build real PDFs, render them, and check the output of
-  every engine.
+- **82 tests, about a minute.** They build real PDFs, render them, and check the output of every
+  engine. Some render the output with Windows' PDF engine to check that things are actually
+  visible: the signature box, filled dropdowns, black & white scans.
 - **Optional parts.** The OCR test runs only if a Windows OCR language is installed. The
   Microsoft Office test runs only if Word is installed. Otherwise they return early and count
   as passed.
@@ -372,16 +361,24 @@ it; nothing needs installing.
   Directory.Build.props        shared target framework, version, nullable settings
   docs/FEATURES.md             iLovePDF analysis and PageSmith mapping
   scripts/publish.ps1          release build script
-  src/PageSmith.Core/          all PDF work, no UI: Tools/, Pdf/, Text/, Ocr/, Office/, Intelligence/, Workflows/, Net/
-  src/PageSmith.App/           WPF app: MainWindow, Pages/, Tools/ (controllers + option templates), Controls/, Infrastructure/, Themes/
+  src/PageSmith.Core/          all PDF work, no UI: Tools/, Pdf/, Text/, Imaging/, Ocr/, Office/, Intelligence/, Workflows/, Net/
+  src/PageSmith.App/           WPF app:
+    Controls/                  FileList, PageGrid, PageEditor (+ ElementVisual), CompareView, ScanWorkspace,
+                               HtmlWorkspace, SignaturePad, CameraWindow, ToolShell, ResultView
+    Tools/                     one controller per tool; Tools/Editor/ holds the page-editor tools;
+                               OptionTemplates.xaml and EditorTemplates.xaml are their option panels
+    Infrastructure/            registry, settings, services, WebPageCapture (HTML), ScanSources (WIA)
+    Pages/                     Home, Workflows, Settings, About
   tests/PageSmith.Tests/       xUnit tests for the engines
   tools/IconGen/               renders Assets/PageSmith.ico and PNG icons
   ```
 
 - **Adding a tool:**
   1. Write the engine in `PageSmith.Core/Tools/...` with tests.
-  2. Add a controller in `PageSmith.App/Tools/`.
-  3. Add a `DataTemplate` for its options in `Tools/OptionTemplates.xaml`.
+  2. Add a controller in `PageSmith.App/Tools/`. Derive from `EditorController` if the tool
+     places things on pages.
+  3. Add a `DataTemplate` for its options in `Tools/OptionTemplates.xaml` (or
+     `EditorTemplates.xaml`).
   4. Add a `ToolDescriptor` in `Infrastructure/ToolRegistry.cs`.
   5. Add a page type in `Infrastructure/ToolPages.cs`.
 - **Screenshot mode,** for checking screens without clicking:
@@ -390,19 +387,29 @@ it; nothing needs installing.
   PageSmith.exe --page compress --files "a.pdf;b.pdf" --theme dark --width 1360 --height 880 --delay 4000 --snapshot shot.png
   ```
 
-  Add `--run` to press the tool's button before the screenshot. `--page` also accepts `home`,
-  `workflows`, `settings` and `about`.
+  - `--run` presses the tool's button before the screenshot.
+  - `--demo` sets the tool up first: places sample text, shapes, signatures and redaction marks
+    through the same code paths as clicks, fills forms, or picks a change in Compare.
+  - `--demo-alt` shows the tool's dialog or other view instead (the signature pad, Compare's
+    overlay).
+  - Snapshot windows don't take keyboard focus, so they can run while you use the PC.
+  - `--page` also accepts `home`, `workflows`, `settings` and `about`.
 - **"File is locked by PageSmith" build errors** mean the app is still running. Close it, or run
   `Stop-Process -Name PageSmith`.
 - **Icons:** WPF-UI's `SymbolIcon` can only draw Fluent icons whose code point is in the Basic
   Multilingual Plane. Some icons (for example `Flow24`, `PenSparkle24`) render as boxes; pick
   another one.
+- **Tool pages** opt out of the navigation view's scroll viewer, so they fit the window. They set
+  their own theme text colour for the same reason (see `ToolPages.cs`).
 - **PDFsharp is pinned to 6.2.4 (MIT).** Check the licence before upgrading, because later
   releases are not MIT-licensed.
 - **Text files are UTF-8 without BOM.** When scripting edits in Windows PowerShell 5.1, pass
   `-Encoding UTF8` or use `[IO.File]::ReadAllText(path, UTF8Encoding)`. Otherwise characters
   like "…" and "·" get mangled.
-- **App data:** `%APPDATA%\PageSmith\` holds `settings.json`, `workflows.json` and `pagesmith.log`.
+- **App data:**
+  - `%APPDATA%\PageSmith\` holds `settings.json`, `workflows.json` and `pagesmith.log`.
+  - `%LOCALAPPDATA%\PageSmith\WebView2` is HTML to PDF's browser profile.
+  - Scanned pages and photos wait in `%TEMP%\PageSmith\Scans` until they're turned into a PDF.
 
 ---
 
@@ -410,7 +417,7 @@ it; nothing needs installing.
 
 | Branch | Purpose |
 |---|---|
-| `main` | Released versions only; every merge is tagged (`v0.1.0`, `v1.0.0`, …) |
+| `main` | Released versions only; every merge is tagged (`v0.1.0`, `v0.2.0`, `v1.0.0`, …) |
 | `develop` | Integration branch; always builds and passes tests |
 | `feature/<name>` | One feature each (`feature/ui-tools`, `feature/ml-deskew`, …), merged into `develop` with `--no-ff` |
 | `release/<version>` | Final checks and version bump, merged into `main` (tagged) and back into `develop` |

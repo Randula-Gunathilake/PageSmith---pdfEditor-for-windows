@@ -17,6 +17,11 @@ public abstract class ToolPage : Page, INavigationAware
         Controller = ToolRegistry.Get(toolId).CreateController();
         Content = new ToolShell { DataContext = Controller };
         Title = Controller.Descriptor.Title;
+        // Tool pages fit the window and scroll inside their own panels; without this the navigation
+        // view wraps them in a scroll viewer and editors grow taller than the window.
+        ScrollViewer.SetCanContentScroll(this, false);
+        // That scroll viewer also supplied the theme's text colour; a bare Page defaults to black text.
+        SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
     }
 
     public ToolController Controller { get; }

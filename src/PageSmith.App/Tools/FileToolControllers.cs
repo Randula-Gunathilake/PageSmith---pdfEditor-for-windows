@@ -585,22 +585,10 @@ public sealed partial class ProtectController() : ToolController("protect")
 public sealed partial class SummarizeController() : ToolController("summarize")
 {
     [ObservableProperty] public partial SummaryLength Length { get; set; } = SummaryLength.Medium;
-    [ObservableProperty] public partial bool UseClaude { get; set; } = AppServices.Settings.UseClaudeForSummaries;
     [ObservableProperty] public partial string OutputFormat { get; set; } = "Markdown";
-    [ObservableProperty] public partial string OutputLanguage { get; set; } = "English";
 
-    public bool HasClaudeKey => AppServices.Settings.AnthropicKey.Length > 0;
-    public IReadOnlyList<string> LanguageNames { get; } = Core.Intelligence.Languages.All.Select(l => l.Name).ToList();
-
-    public override Task OnShownAsync()
-    {
-        OnPropertyChanged(nameof(HasClaudeKey));
-        return Task.CompletedTask;
-    }
-
-    public override string? Validate() =>
-        UseClaude && !HasClaudeKey ? "Add your Anthropic API key in Settings › AI services, or use the offline summarizer." : base.Validate();
-
+    // The app only offers the on-device summarizer. SummarizeTool still supports SummaryEngine.Claude
+    // for a future online option; it is deliberately not exposed here.
     protected override Task<ToolResult> RunCoreAsync(IProgress<ToolProgress> progress, CancellationToken ct)
     {
         var f = Files[0];
@@ -610,9 +598,7 @@ public sealed partial class SummarizeController() : ToolController("summarize")
             Input = f.ToInput(),
             OutputPath = OutputPaths.Unique(OutputDirectory(f.Path), Path.GetFileNameWithoutExtension(f.Path) + "_summary" + ext),
             Length = Length,
-            Engine = UseClaude ? SummaryEngine.Claude : SummaryEngine.Offline,
-            ApiKey = AppServices.Settings.AnthropicKey,
-            OutputLanguage = OutputLanguage,
+            Engine = SummaryEngine.Offline,
         }, progress, ct);
     }
 }

@@ -228,6 +228,7 @@ public static class FormsTool
                 field.Elements.SetString("/V", index >= 0 ? OptionText(field, index) : value);
                 if (index >= 0) field.Elements["/I"] = new PdfArray(field.Owner, new PdfInteger(index));
                 else field.Elements.Remove("/I");
+                if (field is PdfComboBoxField) RefreshChoiceAppearance(field, index >= 0 ? OptionDisplay(field, index) : value);
                 return true;
             }
             case PdfRadioButtonField:
@@ -259,6 +260,90 @@ public static class FormsTool
         var item = field.Elements.GetArray("/Opt")!.Elements[index];
         if (item is PdfReference r) item = r.Value;
         return item is PdfArray pair && pair.Elements.Count > 0 ? Str(pair.Elements[0]) : Str(item);
+    }
+
+    /// <summary>The text shown for option <paramref name="index"/> (second element of [export display] pairs).</summary>
+    private static string OptionDisplay(PdfAcroField field, int index)
+    {
+        var item = field.Elements.GetArray("/Opt")!.Elements[index];
+        if (item is PdfReference r) item = r.Value;
+        return item is PdfArray pair && pair.Elements.Count > 1 ? Str(pair.Elements[1]) : Str(item);
+    }
+
+    /// <summary>
+    /// Writes a dropdown appearance that shows the chosen value. Viewers that ignore /NeedAppearances
+    /// (such as the PDF engine built into Windows) would otherwise keep showing the old, often empty, box.
+    /// </summary>
+    private static void RefreshChoiceAppearance(PdfAcroField field, string text)
+    {
+        var doc = field.Owner;
+        foreach (var widget in Widgets(field))
+        {
+            var rect = widget.Elements.GetArray("/Rect");
+            if (rect == null || rect.Elements.Count < 4) continue;
+            var w = Math.Abs(Number(rect.Elements[2]) - Number(rect.Elements[0]));
+            var h = Math.Abs(Number(rect.Elements[3]) - Number(rect.Elements[1]));
+            if (w < 1 || h < 1) continue;
+
+            var da = widget.Elements.GetString("/DA") is { Length: > 0 } own ? own : field.Elements.GetString("/DA") ?? "";
+            var match = System.Text.RegularExpressions.Regex.Match(da, @"([\d.]+)\s+Tf");
+            var size = match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var s) && s > 0 ? s : h * 0.6;
+            size = Math.Clamp(size, 4, Math.Max(4, h * 0.85));
+
+            // Colours from the field's /MK; fields without one (like those PageSmith creates) get the usual white box.
+            var mk = widget.Elements.GetDictionary("/MK");
+            var content = new StringBuilder();
+            var bg = mk == null ? "1 g" : ColorOperator(mk.Elements.GetArray("/BG"), fill: true);
+            var bc = mk == null ? "0.55 G" : ColorOperator(mk.Elements.GetArray("/BC"), fill: false);
+            if (bg != null) content.Append($"q {bg} 0 0 {N(w)} {N(h)} re f Q ");
+            if (bc != null) content.Append($"q {bc} 0.75 w 0.5 0.5 {N(w - 1)} {N(h - 1)} re S Q ");
+            content.Append($"/Tx BMC q 1 1 {N(w - 2)} {N(h - 2)} re W n BT /Helv {N(size)} Tf 0 g 2 {N((h - size * 0.72) / 2)} Td ({Literal(text)}) Tj ET Q EMC");
+
+            var form = Appearance(doc, w, h, content.ToString(), false);
+            var resources = new PdfDictionary(doc);
+            var fonts = new PdfDictionary(doc);
+            fonts.Elements.SetReference("/Helv", StandardFont(doc, "Helvetica", true));
+            resources.Elements["/Font"] = fonts;
+            form.Elements["/Resources"] = resources;
+            var ap = new PdfDictionary(doc);
+            ap.Elements.SetReference("/N", form);
+            widget.Elements["/AP"] = ap;
+        }
+    }
+
+    private static double Number(PdfItem item) => item switch
+    {
+        PdfReal r => r.Value,
+        PdfInteger i => i.Value,
+        _ => 0,
+    };
+
+    /// <summary>"r g b rg" / "g G" style operator for a /MK colour array, or null when there is none.</summary>
+    private static string? ColorOperator(PdfArray? color, bool fill)
+    {
+        if (color == null) return null;
+        var v = color.Elements.Select(Number).Select(N).ToList();
+        return v.Count switch
+        {
+            1 => $"{v[0]} {(fill ? "g" : "G")}",
+            3 => $"{v[0]} {v[1]} {v[2]} {(fill ? "rg" : "RG")}",
+            4 => $"{v[0]} {v[1]} {v[2]} {v[3]} {(fill ? "k" : "K")}",
+            _ => null,
+        };
+    }
+
+    /// <summary>Escapes text for a PDF literal string in WinAnsi (characters it can't show become '?').</summary>
+    private static string Literal(string text)
+    {
+        var sb = new StringBuilder();
+        foreach (var c in text)
+        {
+            if (c is '(' or ')' or '\\') sb.Append('\\').Append(c);
+            else if (c < 32 || c > 255) sb.Append('?');
+            else if (c > 126) sb.Append('\\').Append(System.Convert.ToString(c, 8).PadLeft(3, '0'));
+            else sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     private static int IndexOfOption(PdfAcroField field, string value)

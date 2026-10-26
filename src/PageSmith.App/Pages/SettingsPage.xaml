@@ -181,7 +181,7 @@
                     </StackPanel>
                 </ui:CardExpander.Header>
                 <StackPanel>
-                    <TextBlock Style="{StaticResource OptionHint}" Text="Optional. With your own API key, PageSmith can write AI summaries and translate PDFs with Claude. Document text is sent to Anthropic only when you use these features." />
+                    <TextBlock Style="{StaticResource OptionHint}" Text="Optional. With your own API key, Translate PDF can use Claude. Document text is sent to Anthropic only when you translate with Claude." />
                     <ui:PasswordBox
                         MaxWidth="420"
                         Margin="0,6,0,0"
@@ -199,10 +199,6 @@
                         MaxWidth="260"
                         HorizontalAlignment="Left"
                         Text="{Binding ClaudeModel, UpdateSourceTrigger=LostFocus}" />
-                    <CheckBox
-                        Margin="0,10,0,0"
-                        Content="Use Claude for summaries by default"
-                        IsChecked="{Binding UseClaudeForSummaries}" />
                 </StackPanel>
             </ui:CardExpander>
 
