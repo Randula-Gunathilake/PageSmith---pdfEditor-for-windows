@@ -1,18 +1,15 @@
-﻿<ui:FluentWindow
+<ui:FluentWindow
     x:Class="PageSmith.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Title="PageSmith"
-    Width="1360"
-    Height="880"
     MinWidth="1000"
     MinHeight="640"
     ExtendsContentIntoTitleBar="True"
     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
     WindowBackdropType="Mica"
-    WindowCornerPreference="Round"
-    WindowStartupLocation="CenterScreen">
+    WindowCornerPreference="Round">
     <Grid x:Name="Root">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
