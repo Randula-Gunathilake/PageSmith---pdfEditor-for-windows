@@ -1,0 +1,817 @@
+<UserControl
+    x:Class="PageSmith.App.Controls.DocumentView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:PageSmith.App.Controls"
+    xmlns:corepdf="clr-namespace:PageSmith.Core.Pdf;assembly=PageSmith.Core"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:docs="clr-namespace:PageSmith.App.Documents"
+    xmlns:infra="clr-namespace:PageSmith.App.Infrastructure"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    d:DataContext="{d:DesignInstance Type=docs:DocumentSession}"
+    Background="{DynamicResource LayerFillColorDefaultBrush}"
+    mc:Ignorable="d">
+    <UserControl.Resources>
+        <!--  Icon buttons of the toolbar  -->
+        <Style
+            x:Key="BarButton"
+            BasedOn="{StaticResource {x:Type ui:Button}}"
+            TargetType="ui:Button">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="MinWidth" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
+
+        <Style x:Key="BarToggle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border
+                            x:Name="Box"
+                            Background="Transparent"
+                            CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--  Left rail buttons, with an accent bar on the open panel  -->
+        <Style
+            x:Key="RailButton"
+            BasedOn="{StaticResource BarToggle}"
+            TargetType="ToggleButton">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid>
+                            <Border
+                                x:Name="Box"
+                                Background="Transparent"
+                                CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border
+                                x:Name="Bar"
+                                Width="3"
+                                Height="18"
+                                HorizontalAlignment="Left"
+                                Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                CornerRadius="2"
+                                Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                                <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BarSeparator" TargetType="Border">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Margin" Value="6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+        </Style>
+
+        <Style x:Key="PaneHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <!--  The reader, hidden while a tool works on the document  -->
+        <Grid x:Name="Reader">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!--  Toolbar  -->
+            <Border
+                Grid.Row="0"
+                Padding="8,4"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+                <DockPanel LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                        <ui:Button
+                            Click="OnSave"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Save (Ctrl+S)">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="Save24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ui:Button
+                            Click="OnSaveAs"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Save as (Ctrl+Shift+S)">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="SaveCopy24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ui:Button
+                            Click="OnPrint"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Print (Ctrl+P)">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="Print24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <Border Style="{StaticResource BarSeparator}" />
+                        <ui:Button
+                            Click="OnUndo"
+                            IsEnabled="{Binding CanUndo}"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="{Binding UndoDescription, StringFormat='Undo {0} (Ctrl+Z)', TargetNullValue='Undo (Ctrl+Z)'}"
+                            ToolTipService.ShowOnDisabled="True">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ArrowUndo24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ui:Button
+                            Click="OnRedo"
+                            IsEnabled="{Binding CanRedo}"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="{Binding RedoDescription, StringFormat='Redo {0} (Ctrl+Y)', TargetNullValue='Redo (Ctrl+Y)'}"
+                            ToolTipService.ShowOnDisabled="True">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ArrowRedo24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <Border Style="{StaticResource BarSeparator}" />
+                        <ui:Button
+                            Click="OnPreviousPage"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Previous page">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ChevronUp24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <TextBox
+                            x:Name="PageBox"
+                            Width="52"
+                            MinWidth="0"
+                            Margin="2,0"
+                            Padding="4,5"
+                            VerticalAlignment="Center"
+                            GotKeyboardFocus="OnPageBoxFocus"
+                            KeyDown="OnPageBoxKey"
+                            LostKeyboardFocus="OnPageBoxLostFocus"
+                            Text="1"
+                            TextAlignment="Center"
+                            ToolTip="Go to page (Ctrl+G)" />
+                        <TextBlock
+                            x:Name="PageCountText"
+                            Margin="4,0,2,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            Text="{Binding PageCount, StringFormat='of {0}'}" />
+                        <ui:Button
+                            Click="OnNextPage"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Next page">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ChevronDown24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <Border Style="{StaticResource BarSeparator}" />
+                        <ui:Button
+                            Click="OnZoomOut"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Zoom out (Ctrl+−)">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ZoomOut24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ComboBox
+                            x:Name="ZoomBox"
+                            Width="104"
+                            MinWidth="0"
+                            Margin="2,0"
+                            VerticalAlignment="Center"
+                            IsEditable="True"
+                            KeyDown="OnZoomBoxKey"
+                            SelectionChanged="OnZoomPicked"
+                            ToolTip="Zoom">
+                            <ComboBoxItem Content="Fit width" Tag="width" />
+                            <ComboBoxItem Content="Fit page" Tag="page" />
+                            <ComboBoxItem Content="50%" Tag="0.5" />
+                            <ComboBoxItem Content="75%" Tag="0.75" />
+                            <ComboBoxItem Content="100%" Tag="1" />
+                            <ComboBoxItem Content="125%" Tag="1.25" />
+                            <ComboBoxItem Content="150%" Tag="1.5" />
+                            <ComboBoxItem Content="200%" Tag="2" />
+                            <ComboBoxItem Content="300%" Tag="3" />
+                            <ComboBoxItem Content="400%" Tag="4" />
+                        </ComboBox>
+                        <ui:Button
+                            Click="OnZoomIn"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Zoom in (Ctrl++)">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ZoomIn24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ToggleButton
+                            x:Name="FitWidthToggle"
+                            Click="OnFitWidth"
+                            Style="{StaticResource BarToggle}"
+                            ToolTip="Fit width (Ctrl+2)">
+                            <ui:SymbolIcon FontSize="18" Symbol="ArrowAutofitWidth24" />
+                        </ToggleButton>
+                        <ToggleButton
+                            x:Name="FitPageToggle"
+                            Click="OnFitPage"
+                            Style="{StaticResource BarToggle}"
+                            ToolTip="Fit page (Ctrl+0)">
+                            <ui:SymbolIcon FontSize="18" Symbol="PageFit24" />
+                        </ToggleButton>
+                        <Border Style="{StaticResource BarSeparator}" />
+                        <ToggleButton
+                            x:Name="SelectToggle"
+                            Click="OnSelectTool"
+                            IsChecked="True"
+                            Style="{StaticResource BarToggle}"
+                            ToolTip="Select text">
+                            <ui:SymbolIcon FontSize="18" Symbol="Cursor24" />
+                        </ToggleButton>
+                        <ToggleButton
+                            x:Name="HandToggle"
+                            Click="OnHandTool"
+                            Style="{StaticResource BarToggle}"
+                            ToolTip="Hand: drag to move the pages (or hold Space)">
+                            <ui:SymbolIcon FontSize="18" Symbol="HandRight24" />
+                        </ToggleButton>
+                        <Border Style="{StaticResource BarSeparator}" />
+                        <ToggleButton
+                            x:Name="FindToggle"
+                            Click="OnFindToggle"
+                            Style="{StaticResource BarToggle}"
+                            ToolTip="Find (Ctrl+F)">
+                            <ui:SymbolIcon FontSize="18" Symbol="Search24" />
+                        </ToggleButton>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <ui:Button
+                            Click="OnProperties"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Document properties (Ctrl+D)">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="Info24" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ToggleButton
+                            x:Name="ToolsToggle"
+                            Width="Auto"
+                            Padding="10,0"
+                            Click="OnToolsToggle"
+                            Style="{StaticResource BarToggle}"
+                            ToolTip="Show or hide all tools">
+                            <StackPanel Margin="10,0" Orientation="Horizontal">
+                                <ui:SymbolIcon FontSize="18" Symbol="Toolbox24" />
+                                <TextBlock
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Text="All tools" />
+                            </StackPanel>
+                        </ToggleButton>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!--  Find bar  -->
+            <Border
+                x:Name="FindBar"
+                Grid.Row="1"
+                Padding="12,6"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal">
+                    <ui:TextBox
+                        x:Name="FindBox"
+                        Width="300"
+                        KeyDown="OnFindKey"
+                        PlaceholderText="Find in document"
+                        TextChanged="OnFindTextChanged">
+                        <ui:TextBox.Icon>
+                            <ui:SymbolIcon Symbol="Search24" />
+                        </ui:TextBox.Icon>
+                    </ui:TextBox>
+                    <ui:Button
+                        Margin="6,0,0,0"
+                        Click="OnFindPrevious"
+                        Style="{StaticResource BarButton}"
+                        ToolTip="Previous match (Shift+Enter)">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="ChevronUp24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                    <ui:Button
+                        Click="OnFindNext"
+                        Style="{StaticResource BarButton}"
+                        ToolTip="Next match (Enter)">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="ChevronDown24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                    <TextBlock
+                        x:Name="FindStatus"
+                        MinWidth="96"
+                        Margin="10,0"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <CheckBox
+                        x:Name="MatchCase"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Checked="OnFindOptionChanged"
+                        Content="Match case"
+                        Unchecked="OnFindOptionChanged" />
+                    <CheckBox
+                        x:Name="WholeWords"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Checked="OnFindOptionChanged"
+                        Content="Whole words"
+                        Unchecked="OnFindOptionChanged" />
+                    <ui:Button
+                        x:Name="OcrButton"
+                        Margin="12,0,0,0"
+                        Click="OnRunOcr"
+                        Content="Make it searchable (OCR)"
+                        Visibility="Collapsed">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="ScanText24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                    <ui:Button
+                        Margin="8,0,0,0"
+                        Click="OnCloseFind"
+                        Style="{StaticResource BarButton}"
+                        ToolTip="Close (Esc)">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="Dismiss24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                </StackPanel>
+            </Border>
+
+            <!--  Body  -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition x:Name="SideColumn" Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!--  Rail  -->
+                <Border
+                    Grid.Column="0"
+                    Padding="4,8"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,1,0">
+                    <StackPanel>
+                        <ToggleButton
+                            x:Name="PagesToggle"
+                            Click="OnRailClick"
+                            Style="{StaticResource RailButton}"
+                            Tag="pages"
+                            ToolTip="Pages">
+                            <ui:SymbolIcon FontSize="20" Symbol="SquareMultiple24" />
+                        </ToggleButton>
+                        <ToggleButton
+                            x:Name="BookmarksToggle"
+                            Click="OnRailClick"
+                            Style="{StaticResource RailButton}"
+                            Tag="bookmarks"
+                            ToolTip="Bookmarks">
+                            <ui:SymbolIcon FontSize="20" Symbol="BookmarkMultiple24" />
+                        </ToggleButton>
+                    </StackPanel>
+                </Border>
+
+                <!--  Side panel: thumbnails or bookmarks  -->
+                <Border
+                    x:Name="SidePanel"
+                    Grid.Column="1"
+                    Width="216"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,1,0"
+                    Visibility="Collapsed">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Margin="14,10,6,6">
+                            <ui:Button
+                                Click="OnCloseSidePanel"
+                                DockPanel.Dock="Right"
+                                Style="{StaticResource BarButton}"
+                                ToolTip="Close">
+                                <ui:Button.Icon>
+                                    <ui:SymbolIcon Symbol="Dismiss24" />
+                                </ui:Button.Icon>
+                            </ui:Button>
+                            <TextBlock
+                                x:Name="SideTitle"
+                                Style="{StaticResource PaneHeader}"
+                                Text="Pages" />
+                        </DockPanel>
+
+                        <ListBox
+                            x:Name="Thumbs"
+                            Grid.Row="1"
+                            Padding="0,0,0,12"
+                            AllowDrop="True"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            DragLeave="OnThumbsDragLeave"
+                            DragOver="OnThumbsDragOver"
+                            Drop="OnThumbsDrop"
+                            KeyDown="OnThumbsKey"
+                            PreviewMouseLeftButtonDown="OnThumbsMouseDown"
+                            PreviewMouseMove="OnThumbsMouseMove"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                            SelectionChanged="OnThumbSelectionChanged"
+                            SelectionMode="Extended"
+                            VirtualizingPanel.IsVirtualizing="True"
+                            VirtualizingPanel.ScrollUnit="Pixel"
+                            VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.ContextMenu>
+                                <ContextMenu Opened="OnThumbMenuOpened">
+                                    <MenuItem Click="OnRotatePagesRight" Header="Rotate clockwise">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="ArrowRotateClockwise24" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Click="OnRotatePagesLeft" Header="Rotate counterclockwise">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="ArrowRotateCounterclockwise24" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
+                                    <MenuItem
+                                        x:Name="DeletePagesItem"
+                                        Click="OnDeletePages"
+                                        Header="Delete pages"
+                                        InputGestureText="Del">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="Delete24" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Click="OnExtractPages" Header="Extract to a new tab">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="DocumentArrowRight24" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
+                                    <MenuItem Click="OnInsertFromFile" Header="Insert pages from a file…">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="DocumentAdd24" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Click="OnInsertBlank" Header="Insert a blank page">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="Add24" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                            <ListBox.ItemContainerStyle>
+                                <!--  The page in view is outlined in the accent colour, like a reader's thumbnails.  -->
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="6,8,6,4" />
+                                    <Setter Property="Margin" Value="10,2" />
+                                    <Setter Property="Cursor" Value="Hand" />
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border
+                                                    x:Name="Box"
+                                                    Padding="{TemplateBinding Padding}"
+                                                    Background="Transparent"
+                                                    BorderBrush="Transparent"
+                                                    BorderThickness="2"
+                                                    CornerRadius="6">
+                                                    <ContentPresenter HorizontalAlignment="Center" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                                                        <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type controls:PageThumbnail}">
+                                    <StackPanel DataContextChanged="OnThumbDataChanged" Loaded="OnThumbLoaded">
+                                        <Border
+                                            Width="{Binding Width}"
+                                            Height="{Binding Height}"
+                                            HorizontalAlignment="Center"
+                                            Background="White"
+                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1">
+                                            <Image Source="{Binding Image}" Stretch="Uniform" />
+                                        </Border>
+                                        <TextBlock
+                                            Margin="0,6,0,0"
+                                            HorizontalAlignment="Center"
+                                            FontSize="12"
+                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                            Text="{Binding Label}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <TreeView
+                            x:Name="Outline"
+                            Grid.Row="1"
+                            Padding="4,0,4,12"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Visibility="Collapsed">
+                            <TreeView.Resources>
+                                <HierarchicalDataTemplate DataType="{x:Type corepdf:OutlineItem}" ItemsSource="{Binding Children}">
+                                    <TextBlock
+                                        Padding="0,3"
+                                        Text="{Binding Title}"
+                                        TextTrimming="CharacterEllipsis"
+                                        ToolTip="{Binding Title}" />
+                                </HierarchicalDataTemplate>
+                            </TreeView.Resources>
+                            <TreeView.ItemContainerStyle>
+                                <Style BasedOn="{StaticResource {x:Type TreeViewItem}}" TargetType="TreeViewItem">
+                                    <EventSetter Event="MouseLeftButtonUp" Handler="OnBookmarkClick" />
+                                </Style>
+                            </TreeView.ItemContainerStyle>
+                        </TreeView>
+                        <TextBlock
+                            x:Name="NoBookmarks"
+                            Grid.Row="1"
+                            Margin="16,4,16,0"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            Text="This document has no bookmarks."
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
+                    </Grid>
+                </Border>
+
+                <!--  Pages  -->
+                <controls:PdfViewer x:Name="Viewer" Grid.Column="2">
+                    <controls:PdfViewer.ContextMenu>
+                        <ContextMenu Opened="OnViewerMenuOpened">
+                            <MenuItem
+                                x:Name="CopyItem"
+                                Click="OnCopy"
+                                Header="Copy"
+                                InputGestureText="Ctrl+C">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="Copy24" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem
+                                Click="OnSelectAll"
+                                Header="Select all"
+                                InputGestureText="Ctrl+A" />
+                            <Separator />
+                            <MenuItem
+                                x:Name="HighlightItem"
+                                Click="OnHighlight"
+                                Header="Highlight">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="Highlight24" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem
+                                x:Name="UnderlineItem"
+                                Click="OnUnderline"
+                                Header="Underline">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="TextUnderline24" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem
+                                x:Name="StrikeItem"
+                                Click="OnStrikeout"
+                                Header="Strikethrough">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="TextStrikethrough24" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem
+                                x:Name="RedactSelectionItem"
+                                Click="OnRedactSelection"
+                                Header="Redact">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="EyeOff24" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Click="OnZoomIn" Header="Zoom in" />
+                            <MenuItem Click="OnZoomOut" Header="Zoom out" />
+                            <MenuItem Click="OnFitWidth" Header="Fit width" />
+                            <MenuItem Click="OnFitPage" Header="Fit page" />
+                        </ContextMenu>
+                    </controls:PdfViewer.ContextMenu>
+                </controls:PdfViewer>
+
+                <!--  All tools  -->
+                <Border
+                    x:Name="ToolsPane"
+                    Grid.Column="3"
+                    Width="292"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1,0,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Margin="16,10,6,4">
+                            <ui:Button
+                                Click="OnToolsToggle"
+                                DockPanel.Dock="Right"
+                                Style="{StaticResource BarButton}"
+                                ToolTip="Close">
+                                <ui:Button.Icon>
+                                    <ui:SymbolIcon Symbol="Dismiss24" />
+                                </ui:Button.Icon>
+                            </ui:Button>
+                            <TextBlock Style="{StaticResource PaneHeader}" Text="All tools" />
+                        </DockPanel>
+                        <ui:TextBox
+                            x:Name="ToolSearch"
+                            Grid.Row="1"
+                            Margin="14,2,14,8"
+                            PlaceholderText="Search tools"
+                            TextChanged="OnToolSearchChanged">
+                            <ui:TextBox.Icon>
+                                <ui:SymbolIcon Symbol="Search24" />
+                            </ui:TextBox.Icon>
+                        </ui:TextBox>
+                        <ScrollViewer
+                            Grid.Row="2"
+                            Padding="10,0,10,12"
+                            VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="ToolGroups">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type controls:ToolGroup}">
+                                        <StackPanel Margin="0,6,0,4">
+                                            <TextBlock
+                                                Margin="6,4,0,4"
+                                                FontSize="12"
+                                                FontWeight="SemiBold"
+                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                Text="{Binding Title}" />
+                                            <ItemsControl ItemsSource="{Binding Tools}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type infra:ToolDescriptor}">
+                                                        <Button
+                                                            Margin="0,1"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            Click="OnToolClick"
+                                                            Cursor="Hand"
+                                                            Tag="{Binding Id}"
+                                                            ToolTip="{Binding Description}">
+                                                            <Button.Template>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <Border
+                                                                        x:Name="Box"
+                                                                        Padding="6,5"
+                                                                        Background="Transparent"
+                                                                        CornerRadius="6">
+                                                                        <ContentPresenter />
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Button.Template>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Border
+                                                                    Width="28"
+                                                                    Height="28"
+                                                                    Background="{Binding Accent, Converter={StaticResource HexToBrush}}"
+                                                                    CornerRadius="7">
+                                                                    <ui:SymbolIcon
+                                                                        FontSize="16"
+                                                                        Foreground="White"
+                                                                        Symbol="{Binding Icon}" />
+                                                                </Border>
+                                                                <TextBlock
+                                                                    Margin="10,0,0,0"
+                                                                    VerticalAlignment="Center"
+                                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                                    Text="{Binding Title}" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+
+        </Grid>
+
+        <!--  A tool working on this document  -->
+        <Grid x:Name="ToolMode" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border
+                Padding="10,6"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+                <DockPanel>
+                    <ui:Button
+                        Click="OnCloseTool"
+                        Content="Back to document"
+                        DockPanel.Dock="Left">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="ArrowLeft24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                    <TextBlock
+                        x:Name="ToolHint"
+                        Margin="12,0,6,0"
+                        VerticalAlignment="Center"
+                        DockPanel.Dock="Right"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBlock
+                        x:Name="ToolModeTitle"
+                        Margin="14,0,0,0"
+                        VerticalAlignment="Center"
+                        FontWeight="SemiBold"
+                        TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+            </Border>
+            <ContentControl
+                x:Name="ToolContent"
+                Grid.Row="1"
+                Focusable="False" />
+        </Grid>
+    </Grid>
+</UserControl>

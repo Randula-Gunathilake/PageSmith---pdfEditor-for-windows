@@ -12,6 +12,11 @@ using PageSmith.Core.Tools.Optimize;
 
 namespace PageSmith.App.Tools;
 
+/// <summary>How a tool runs on a document open in a tab.</summary>
+/// <param name="OutputFolder">Where results go: the document's working folder when it edits the document, else next to the file.</param>
+/// <param name="EditsDocument">Whether the single PDF result replaces the open document.</param>
+public sealed record DocumentToolContext(string OutputFolder, bool EditsDocument);
+
 public enum WorkspaceKind
 {
     /// <summary>A list of input files.</summary>
@@ -127,6 +132,15 @@ public abstract partial class ToolController : ObservableObject
     /// <summary>Development aid for --demo-alt: shows the tool's dialog or alternative view.</summary>
     public virtual void ShowDemoAlternative() { }
 
+    /// <summary>
+    /// Set when the tool works on a document open in a tab: where results go, and whether the result
+    /// replaces the document (then results land in the document's private working folder).
+    /// </summary>
+    public DocumentToolContext? Context { get; set; }
+
+    /// <summary>Passwords already known for input files (an open document's), so tools don't ask again.</summary>
+    public Dictionary<string, string> KnownPasswords { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     private bool CanRun() => !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanRun))]
@@ -140,7 +154,7 @@ public abstract partial class ToolController : ObservableObject
             Error = problem;
             return;
         }
-        if (AppServices.Settings.Output == OutputLocation.Ask && !AppServices.AskOutputFolder())
+        if (Context == null && AppServices.Settings.Output == OutputLocation.Ask && !AppServices.AskOutputFolder())
             return;
 
         _cts = new CancellationTokenSource();
@@ -170,9 +184,13 @@ public abstract partial class ToolController : ObservableObject
                     file.Password = password;
                 }
             }
-            AppServices.Settings.AddRecent(Files.Select(f => f.Path));
-            AppServices.SaveSettings();
-            if (AppServices.Settings.OpenFolderAfterSaving && Result?.OutputFiles.Count > 0)
+            // An open document's working copy is private; its real file is already in Recent.
+            if (Context == null)
+            {
+                AppServices.Settings.AddRecent(Files.Select(f => f.Path));
+                AppServices.SaveSettings();
+            }
+            if (AppServices.Settings.OpenFolderAfterSaving && Context?.EditsDocument != true && Result?.OutputFiles.Count > 0)
                 AppServices.ShowInFolder(Result.OutputFiles[0]);
             Status = $"Done in {sw.Elapsed.TotalSeconds:0.#} s";
         }
@@ -249,7 +267,7 @@ public abstract partial class ToolController : ObservableObject
         foreach (var path in accepted)
         {
             if (Files.Any(f => string.Equals(f.Path, path, StringComparison.OrdinalIgnoreCase))) continue;
-            var entry = new FileEntry(path);
+            var entry = new FileEntry(path) { Password = KnownPasswords.GetValueOrDefault(path) };
             Files.Add(entry);
             added.Add(entry);
         }
@@ -288,10 +306,10 @@ public abstract partial class ToolController : ObservableObject
         }
     }
 
-    /// <summary>Folder for outputs, per the user's output setting.</summary>
+    /// <summary>Folder for outputs, per the user's output setting (or the open document's, see <see cref="Context"/>).</summary>
     protected string OutputDirectory(string? firstInput = null)
     {
-        var dir = AppServices.OutputDirectoryFor(firstInput ?? Files.FirstOrDefault()?.Path);
+        var dir = Context?.OutputFolder ?? AppServices.OutputDirectoryFor(firstInput ?? Files.FirstOrDefault()?.Path);
         Directory.CreateDirectory(dir);
         return dir;
     }

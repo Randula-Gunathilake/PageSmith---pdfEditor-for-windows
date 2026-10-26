@@ -41,13 +41,18 @@ public sealed class PageText
 /// <summary>Reads text and layout from PDFs with PdfPig.</summary>
 public static class TextExtractor
 {
-    public static PigDocument Open(InputFile input)
+    public static PigDocument Open(InputFile input) => Open(input, options => PigDocument.Open(input.Path, options));
+
+    /// <summary>Opens a copy of the PDF held in memory, so the file itself is not kept open.</summary>
+    public static PigDocument OpenInMemory(InputFile input) => Open(input, options => PigDocument.Open(File.ReadAllBytes(input.Path), options));
+
+    private static PigDocument Open(InputFile input, Func<ParsingOptions, PigDocument> open)
     {
         var options = new ParsingOptions { UseLenientParsing = true, SkipMissingFonts = true };
         if (!string.IsNullOrEmpty(input.Password)) options.Password = input.Password;
         try
         {
-            return PigDocument.Open(input.Path, options);
+            return open(options);
         }
         catch (Exception ex) when (ex.GetType().Name.Contains("Encrypt") || ex.Message.Contains("password", StringComparison.OrdinalIgnoreCase))
         {

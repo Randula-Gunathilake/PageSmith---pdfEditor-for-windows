@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
@@ -11,20 +12,34 @@ namespace PageSmith.App;
 
 public partial class App : Application
 {
+    private SingleInstance? _instance;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        PdfDocs.EnsureInitialized();
-        DispatcherUnhandledException += OnUnhandled;
-        TaskScheduler.UnobservedTaskException += (_, args) =>
-        {
-            AppServices.LogError(args.Exception);
-            args.SetObserved();
-        };
-
         var args = CommandLine.Parse(e.Args);
         AppServices.IsSnapshotRun = args.Snapshot != null;
+        // One window per user: starting PageSmith again (a PDF opened from Explorer) hands the files to it.
+        // Snapshot runs are separate throwaway processes.
+        if (!AppServices.IsSnapshotRun)
+        {
+            _instance = SingleInstance.TryClaim();
+            if (_instance == null && SingleInstance.Forward(args.Files))
+            {
+                Shutdown();
+                return;
+            }
+        }
+
+        PdfDocs.EnsureInitialized();
+        DispatcherUnhandledException += OnUnhandled;
+        TaskScheduler.UnobservedTaskException += (_, unobserved) =>
+        {
+            AppServices.LogError(unobserved.Exception);
+            unobserved.SetObserved();
+        };
         if (args.Theme != null) AppServices.Settings.Theme = args.Theme.Value;
+        if (args.Panel != null) AppServices.Settings.ReaderPanel = args.Panel;
         if (args.Snapshot != null)
         {
             // Never leave a snapshot run hanging, even if something fails.
@@ -44,14 +59,35 @@ public partial class App : Application
         // A snapshot run must not take keyboard focus from whatever the user is doing.
         if (args.Snapshot != null) window.ShowActivated = false;
         window.Show();
+        _instance?.Listen(files => window.Dispatcher.InvokeAsync(async () =>
+        {
+            BringToFront(window);
+            if (files.Count > 0) await AppServices.Documents.OpenAsync(files);
+        }), AppServices.LogError);
 
         window.Dispatcher.InvokeAsync(async () =>
         {
             await Task.Delay(300);
             if (args.Page != null) OpenPage(args.Page, args.Files);
-            else if (args.Files.Count > 0) OpenFilesFromShell(args.Files);
+            else if (args.Files.Count > 0) await AppServices.Documents.OpenAsync(args.Files);
             if (args.Snapshot != null) await SnapshotAsync(window, args);
         }, DispatcherPriority.ApplicationIdle);
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _instance?.Dispose();
+        base.OnExit(e);
+    }
+
+    private static void BringToFront(Window window)
+    {
+        // Restoring goes back to maximized if the window was maximized before it was minimized.
+        if (window.WindowState == WindowState.Minimized) SystemCommands.RestoreWindow(window);
+        window.Activate();
+        window.Topmost = true;
+        window.Topmost = false;
+        window.Focus();
     }
 
     private static void OpenPage(string page, IReadOnlyList<string> files)
@@ -66,38 +102,43 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Files passed by "Open with" or a shortcut: open the obvious tool for them.</summary>
-    private static void OpenFilesFromShell(IReadOnlyList<string> files)
-    {
-        var ext = Path.GetExtension(files[0]).ToLowerInvariant();
-        var tool = ext switch
-        {
-            ".pdf" when files.Count > 1 => "merge",
-            ".pdf" => "organize",
-            _ when Core.Imaging.ImageIO.IsSupported(files[0]) => "jpg-to-pdf",
-            _ => ToolRegistry.All.FirstOrDefault(t => t.Accepts(files[0]))?.Id,
-        };
-        if (tool != null) AppServices.OpenTool(tool, files);
-    }
-
     /// <summary>Development aid: renders the window to a PNG (optionally after running the tool), then exits.</summary>
     private async Task SnapshotAsync(MainWindow window, CommandLine args)
     {
         await Task.Delay(args.DelayMs);
-        if (args.Demo && FindToolPage(window)?.Controller is { } demo)
+        if (window.ActiveView is { } reader)
+        {
+            // Reader checks: go to a page, select text, search, or open a tool on the document.
+            if (args.GoTo > 0) reader.PageView.GoToPage(args.GoTo - 1);
+            if (args.SelectAll) reader.PageView.SelectAll();
+            if (args.Drag is { Length: 4 } drag)
+            {
+                await reader.Session.GetTextAsync();
+                reader.PageView.SimulateDrag(new Point(drag[0], drag[1]), new Point(drag[2], drag[3]));
+            }
+            if (args.Properties) _ = reader.ShowPropertiesAsync();
+            if (args.Find != null)
+            {
+                reader.Find(args.Find);
+                await Task.Delay(1500);
+            }
+            if (args.DocumentTool != null)
+            {
+                await reader.OpenToolAsync(args.DocumentTool);
+                await Task.Delay(1500);
+            }
+            await Task.Delay(500);
+        }
+        if (args.Demo && FindTool(window) is { } demo)
         {
             await demo.SeedDemoAsync();
             if (args.DemoAlternative) demo.ShowDemoAlternative();
             await Task.Delay(args.DemoAlternative ? 4000 : 1500);
         }
-        if (args.Run)
+        if (args.Run && FindTool(window) is { } tool)
         {
-            var page = FindToolPage(window);
-            if (page != null)
-            {
-                await page.Controller.RunCommand.ExecuteAsync(null);
-                await Task.Delay(800);
-            }
+            await tool.RunCommand.ExecuteAsync(null);
+            await Task.Delay(1500);
         }
         var root = (FrameworkElement)window.Content;
         var dpi = VisualTreeHelper.GetDpi(window);
@@ -120,10 +161,11 @@ public partial class App : Application
         Environment.Exit(0);
     }
 
-    private static ToolPage? FindToolPage(MainWindow window)
-    {
-        return window.PageProvider.Created.OfType<ToolPage>().FirstOrDefault(p => p.IsLoaded);
-    }
+    /// <summary>The tool on screen: one running on the document in front, else the tool page shown on Home.</summary>
+    private static Tools.ToolController? FindTool(MainWindow window) =>
+        window.ActiveView != null
+            ? window.ActiveView.ActiveTool
+            : window.PageProvider.Created.OfType<ToolPage>().FirstOrDefault(p => p.IsLoaded)?.Controller;
 
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
@@ -146,6 +188,18 @@ public sealed class CommandLine
     public bool Run { get; private set; }
     public bool Demo { get; private set; }
     public bool DemoAlternative { get; private set; }
+    public string? Find { get; private set; }
+    public string? DocumentTool { get; private set; }
+    public int GoTo { get; private set; }
+    public bool SelectAll { get; private set; }
+
+    /// <summary>The reader's side panel for this run ("pages", "bookmarks" or "none").</summary>
+    public string? Panel { get; private set; }
+
+    /// <summary>A mouse drag in the reader, "x1,y1,x2,y2" in the page view's coordinates.</summary>
+    public double[]? Drag { get; private set; }
+
+    public bool Properties { get; private set; }
 
     public static CommandLine Parse(string[] args)
     {
@@ -165,6 +219,13 @@ public sealed class CommandLine
                 case "--demo": c.Demo = true; break;
                 case "--demo-alt": c.Demo = c.DemoAlternative = true; break;
                 case "--files": c.Files.AddRange(Next().Split(';', StringSplitOptions.RemoveEmptyEntries)); break;
+                case "--find": c.Find = Next(); break;
+                case "--doc-tool": c.DocumentTool = Next(); break;
+                case "--goto": c.GoTo = int.TryParse(Next(), out var g) ? g : 0; break;
+                case "--select-all": c.SelectAll = true; break;
+                case "--panel": c.Panel = Next(); break;
+                case "--drag": c.Drag = Next().Split(',').Select(v => double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0).ToArray(); break;
+                case "--properties": c.Properties = true; break;
                 default:
                     if (File.Exists(args[i])) c.Files.Add(Path.GetFullPath(args[i]));
                     break;

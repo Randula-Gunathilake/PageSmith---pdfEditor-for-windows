@@ -15,6 +15,7 @@ public static class AppServices
 {
     public static AppSettings Settings { get; } = AppSettings.Load();
     public static ThumbnailCache Thumbnails { get; } = new();
+    public static Documents.DocumentWorkspace Documents { get; } = new();
     public static WorkflowStore Workflows { get; } = new(WorkflowStore.DefaultPath);
 
     /// <summary>Files waiting to be handed to a tool when its page opens (tool id → files).</summary>
@@ -55,12 +56,18 @@ public static class AppServices
         }
     }
 
-    public static void NavigateTo(Type pageType) => Navigation?.Navigate(pageType);
+    public static void NavigateTo(Type pageType)
+    {
+        Documents.Active = null;
+        Navigation?.Navigate(pageType);
+    }
 
     /// <summary>Opens a tool, optionally handing it files (e.g. "Continue with…" or files dropped on Home).</summary>
     public static void OpenTool(string toolId, IEnumerable<string>? files = null)
     {
         if (files != null) PendingFiles[toolId] = files.ToList();
+        // Tool pages live on the Home tab.
+        Documents.Active = null;
         var page = ToolPages.TypeFor(toolId);
         if (Navigation?.Navigate(page) != true && Navigation != null)
             Navigation.NavigateWithHierarchy(page);
