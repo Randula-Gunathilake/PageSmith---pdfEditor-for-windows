@@ -162,10 +162,32 @@ public class EditTests
         Assert.Equal("Japan", values["Country"]);
         Assert.Equal("Large", values["Size"]);
 
+        // The chosen dropdown value must be visible even in viewers that ignore /NeedAppearances (Windows' renderer).
+        using (var renderer = await PageSmith.Core.Rendering.PdfRenderer.OpenAsync(filled))
+        {
+            var px = PageSmith.Core.Imaging.ImageIO.ToPixels(await renderer.RenderAsync(0, 72));
+            var dark = 0;
+            for (var y = 272; y < 288; y++)
+            for (var x = 103; x < 245; x++)
+            {
+                var i = (y * px.Width + x) * 4;
+                if (px.Pixels[i] + px.Pixels[i + 1] + px.Pixels[i + 2] < 300) dark++;
+            }
+            Assert.True(dark > 20, $"dropdown shows no text ({dark} dark pixels)");
+        }
+
         var flat = files.PathFor("flat.pdf");
-        await FormsTool.FillAsync(new FillFormOptions { Input = withFields, OutputPath = flat, Values = new Dictionary<string, string> { ["Full name"] = "Grace Hopper" }, Flatten = true });
+        await FormsTool.FillAsync(new FillFormOptions
+        {
+            Input = withFields,
+            OutputPath = flat,
+            Values = new Dictionary<string, string> { ["Full name"] = "Grace Hopper", ["Country"] = "Japan" },
+            Flatten = true,
+        });
         Assert.Empty(FormsTool.ReadFields(flat));
-        Assert.Contains("Grace Hopper", OrganizeTests.PageTexts(flat)[0]);
+        var flatText = OrganizeTests.PageTexts(flat)[0];
+        Assert.Contains("Grace Hopper", flatText);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(PageSmith.Core.Text.TextExtractor.GetPlainText(flat), "Japan"));
     }
 
     [Fact]

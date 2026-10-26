@@ -51,7 +51,6 @@ public sealed class AppSettings
     public string ProtectedLibreTranslateKey { get; set; } = "";
     public string ProtectedAnthropicKey { get; set; } = "";
     public string ClaudeModel { get; set; } = ClaudeService.DefaultModel;
-    public bool UseClaudeForSummaries { get; set; }
 
     public List<string> RecentFiles { get; set; } = [];
     public List<string> FavoriteTools { get; set; } = ["merge", "split", "compress", "pdf-to-word", "edit", "sign"];

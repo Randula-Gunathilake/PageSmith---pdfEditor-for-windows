@@ -20,7 +20,7 @@
             </StackPanel>
             <TextBlock
                 Margin="0,16,0,0"
-                Text="A native Windows PDF toolbox that covers every tool of iLovePDF — the free and the Premium ones — and runs on your PC. Your files never leave your computer unless you use an online feature (web pages, translation, Claude)."
+                Text="A native Windows PDF toolbox that covers every tool of iLovePDF — the free and the Premium ones — and runs on your PC. Your files never leave your computer unless you use an online feature (web pages, translation)."
                 TextWrapping="Wrap" />
 
             <TextBlock Style="{StaticResource OptionHeader}" Text="Free vs Premium on iLovePDF, and PageSmith" />

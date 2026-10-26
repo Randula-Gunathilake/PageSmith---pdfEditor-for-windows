@@ -382,6 +382,164 @@
         </StackPanel>
     </DataTemplate>
 
+    <DataTemplate DataType="{x:Type tools:ScanController}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource OptionHint}" Text="Scan pages, photograph them or add photos, then put them in order. Each image becomes a page." />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Colour" />
+            <WrapPanel>
+                <RadioButton
+                    Content="Colour"
+                    GroupName="ScanColor"
+                    IsChecked="{Binding ColorMode, Converter={StaticResource EnumEquals}, ConverterParameter=Color}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Greyscale"
+                    GroupName="ScanColor"
+                    IsChecked="{Binding ColorMode, Converter={StaticResource EnumEquals}, ConverterParameter=Grayscale}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Black &amp; white"
+                    GroupName="ScanColor"
+                    IsChecked="{Binding ColorMode, Converter={StaticResource EnumEquals}, ConverterParameter=BlackAndWhite}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <TextBlock Style="{StaticResource OptionHint}" Text="Black &amp; white evens out shadows and makes text crisp, which suits photos of paper." />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Page orientation" />
+            <WrapPanel>
+                <RadioButton
+                    Content="Portrait"
+                    GroupName="ScanOrientation"
+                    IsChecked="{Binding Orientation, Converter={StaticResource EnumEquals}, ConverterParameter=Portrait}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Landscape"
+                    GroupName="ScanOrientation"
+                    IsChecked="{Binding Orientation, Converter={StaticResource EnumEquals}, ConverterParameter=Landscape}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Auto"
+                    GroupName="ScanOrientation"
+                    IsChecked="{Binding Orientation, Converter={StaticResource EnumEquals}, ConverterParameter=Auto}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Page size" />
+            <ComboBox SelectedValue="{Binding PageSize}" SelectedValuePath="Tag">
+                <ComboBoxItem Content="Fit (same size as the image)" Tag="Fit" />
+                <ComboBoxItem Content="A4 (297 × 210 mm)" Tag="A4" />
+                <ComboBoxItem Content="US Letter (215.9 × 279.4 mm)" Tag="Letter" />
+                <ComboBoxItem Content="US Legal (215.9 × 355.6 mm)" Tag="Legal" />
+                <ComboBoxItem Content="A3 (420 × 297 mm)" Tag="A3" />
+                <ComboBoxItem Content="A5 (210 × 148 mm)" Tag="A5" />
+            </ComboBox>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Margin" />
+            <WrapPanel>
+                <RadioButton
+                    Content="No margin"
+                    GroupName="ScanMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=None}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Small"
+                    GroupName="ScanMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=Small}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Big"
+                    GroupName="ScanMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=Big}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <CheckBox
+                Margin="0,12,0,0"
+                Content="Put all pages in one PDF"
+                IsChecked="{Binding MergeIntoOne}" />
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type tools:HtmlToPdfController}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Screen size" />
+            <ComboBox
+                DisplayMemberPath="Label"
+                ItemsSource="{Binding ScreenWidths}"
+                SelectedItem="{Binding ScreenWidth}" />
+            <TextBlock Style="{StaticResource OptionHint}" Text="The page is laid out as it looks on a screen this wide." />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Page size" />
+            <WrapPanel>
+                <RadioButton
+                    Content="A4"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=A4}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="A3"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=A3}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="A5"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=A5}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Letter"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=Letter}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="One long page"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=OneLongPage}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <StackPanel Visibility="{Binding IsOneLongPage, Converter={StaticResource BoolToVisibilityInverted}}">
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Orientation" />
+                <WrapPanel>
+                    <RadioButton
+                        Content="Portrait"
+                        GroupName="WebOrientation"
+                        IsChecked="{Binding Landscape, Converter={StaticResource InverseBool}}"
+                        Style="{StaticResource Segment}" />
+                    <RadioButton
+                        Content="Landscape"
+                        GroupName="WebOrientation"
+                        IsChecked="{Binding Landscape}"
+                        Style="{StaticResource Segment}" />
+                </WrapPanel>
+            </StackPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Margin" />
+            <WrapPanel>
+                <RadioButton
+                    Content="No margin"
+                    GroupName="WebMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=None}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Small"
+                    GroupName="WebMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=Small}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Big"
+                    GroupName="WebMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=Big}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <CheckBox
+                Margin="0,12,0,0"
+                Content="Block ads"
+                IsChecked="{Binding BlockAds}" />
+            <CheckBox
+                Margin="0,8,0,0"
+                Content="Remove pop-ups and cookie banners"
+                IsChecked="{Binding RemovePopups}" />
+            <CheckBox
+                Margin="0,8,0,0"
+                Content="Keep background colours and pictures"
+                IsChecked="{Binding Backgrounds}" />
+        </StackPanel>
+    </DataTemplate>
+
     <DataTemplate DataType="{x:Type tools:OfficeToPdfController}">
         <StackPanel>
             <TextBlock Style="{StaticResource OptionHeader}" Text="Conversion engine" />
@@ -494,22 +652,22 @@
                 <RadioButton
                     Content="Editable text boxes and pictures"
                     IsChecked="{Binding SlidesAsImages, Converter={StaticResource InverseBool}}"
-                    Style="{StaticResource OptionRadio}" />
+                    Margin="0,2,0,6" />
                 <RadioButton
                     Content="Exact look (each page as a picture)"
                     IsChecked="{Binding SlidesAsImages}"
-                    Style="{StaticResource OptionRadio}" />
+                    Margin="0,2,0,6" />
             </StackPanel>
             <StackPanel Visibility="{Binding IsExcel, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Style="{StaticResource OptionHeader}" Text="Layout" />
                 <RadioButton
                     Content="One sheet"
                     IsChecked="{Binding SheetPerPage, Converter={StaticResource InverseBool}}"
-                    Style="{StaticResource OptionRadio}" />
+                    Margin="0,2,0,6" />
                 <RadioButton
                     Content="One sheet per page"
                     IsChecked="{Binding SheetPerPage}"
-                    Style="{StaticResource OptionRadio}" />
+                    Margin="0,2,0,6" />
             </StackPanel>
         </StackPanel>
     </DataTemplate>
@@ -805,11 +963,11 @@
             <RadioButton
                 Content="Over the PDF content"
                 IsChecked="{Binding BelowContent, Converter={StaticResource InverseBool}}"
-                Style="{StaticResource OptionRadio}" />
+                Margin="0,2,0,6" />
             <RadioButton
                 Content="Below the PDF content"
                 IsChecked="{Binding BelowContent}"
-                Style="{StaticResource OptionRadio}" />
+                Margin="0,2,0,6" />
         </StackPanel>
     </DataTemplate>
 
@@ -882,23 +1040,7 @@
                     IsChecked="{Binding Length, Converter={StaticResource EnumEquals}, ConverterParameter=Long}"
                     Style="{StaticResource Segment}" />
             </WrapPanel>
-            <TextBlock Style="{StaticResource OptionHeader}" Text="Engine" />
-            <RadioButton IsChecked="{Binding UseClaude, Converter={StaticResource InverseBool}}" Style="{StaticResource OptionCard}">
-                <StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="On this PC" />
-                    <TextBlock Style="{StaticResource OptionHint}" Text="Picks the key sentences. Private and offline." />
-                </StackPanel>
-            </RadioButton>
-            <RadioButton IsChecked="{Binding UseClaude}" Style="{StaticResource OptionCard}">
-                <StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="Claude (online)" />
-                    <TextBlock Style="{StaticResource OptionHint}" Text="Writes a summary in your words of choice. Needs the internet and your Anthropic API key." />
-                </StackPanel>
-            </RadioButton>
-            <StackPanel Visibility="{Binding UseClaude, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Style="{StaticResource OptionHeader}" Text="Summary language" />
-                <ComboBox ItemsSource="{Binding LanguageNames}" SelectedItem="{Binding OutputLanguage}" />
-            </StackPanel>
+            <TextBlock Style="{StaticResource OptionHint}" Text="Picks the key sentences and keywords on this PC. Your document never leaves your computer." />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Save as" />
             <WrapPanel>
                 <RadioButton
@@ -914,6 +1056,82 @@
                     IsChecked="{Binding OutputFormat, Converter={StaticResource EnumEquals}, ConverterParameter=Text}"
                     Style="{StaticResource Segment}" />
             </WrapPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <!--  ============================== Compare  -->
+    <DataTemplate DataType="{x:Type tools:CompareController}">
+        <StackPanel>
+            <TextBlock
+                Style="{StaticResource OptionHint}"
+                Text="Add two PDFs: the original first, then the new version. Drag the cards to change the order."
+                Visibility="{Binding HasPair, Converter={StaticResource BoolToVisibilityInverted}}" />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Compare" />
+            <RadioButton IsChecked="{Binding Overlay, Converter={StaticResource InverseBool}}" Style="{StaticResource OptionCard}">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="Text changes" />
+                    <TextBlock Style="{StaticResource OptionHint}" Text="Words added, removed or changed, highlighted on both versions, with a change report." />
+                </StackPanel>
+            </RadioButton>
+            <RadioButton IsChecked="{Binding Overlay}" Style="{StaticResource OptionCard}">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="Visual overlay" />
+                    <TextBlock Style="{StaticResource OptionHint}" Text="Pages laid over each other to spot changes in pictures, drawings and layout." />
+                </StackPanel>
+            </RadioButton>
+            <StackPanel Visibility="{Binding Overlay, Converter={StaticResource BoolToVisibilityInverted}}">
+                <CheckBox
+                    Margin="0,6,0,0"
+                    Content="Ignore upper and lower case"
+                    IsChecked="{Binding IgnoreCase}" />
+                <CheckBox
+                    Margin="0,6,0,0"
+                    Content="Ignore punctuation"
+                    IsChecked="{Binding IgnorePunctuation}" />
+            </StackPanel>
+            <StackPanel Visibility="{Binding HasPair, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Changes" />
+                <TextBlock Style="{StaticResource OptionHint}" Text="{Binding Summary}" />
+                <ListBox
+                    MaxHeight="380"
+                    Margin="0,4,0,0"
+                    ItemsSource="{Binding Changes}"
+                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                    SelectedItem="{Binding SelectedChange}"
+                    Visibility="{Binding Overlay, Converter={StaticResource BoolToVisibilityInverted}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type tools:ChangeRow}">
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse
+                                    Width="9"
+                                    Height="9"
+                                    Margin="0,5,8,0"
+                                    VerticalAlignment="Top"
+                                    Fill="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock
+                                        FontSize="11"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding KindText}" />
+                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBlock
+                                    Grid.Column="2"
+                                    Margin="8,0,0,0"
+                                    FontSize="11"
+                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                    Text="{Binding Page, StringFormat='p. {0}'}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
         </StackPanel>
     </DataTemplate>
 

@@ -118,6 +118,15 @@ public abstract partial class ToolController : ObservableObject
 
     public virtual FrameworkElement? CreateWorkspace() => null;
 
+    /// <summary>
+    /// Development aid for the --snapshot --demo mode: sets the tool up through the same entry points a
+    /// user's clicks use (placing items, picking options), so screenshots and --run exercise real code paths.
+    /// </summary>
+    public virtual Task SeedDemoAsync() => Task.CompletedTask;
+
+    /// <summary>Development aid for --demo-alt: shows the tool's dialog or alternative view.</summary>
+    public virtual void ShowDemoAlternative() { }
+
     private bool CanRun() => !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanRun))]

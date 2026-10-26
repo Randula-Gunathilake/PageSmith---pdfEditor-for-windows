@@ -58,5 +58,19 @@ public class SignTests
         Assert.Equal(520, rect.Elements.GetReal(2), 1);
         Assert.Equal(192, rect.Elements.GetReal(3), 1);
         Assert.NotNull(widget.Elements.GetDictionary("/AP"));
+        // Printable, so it also shows in viewers that only draw printable annotations (Windows' renderer) and on paper.
+        Assert.Equal(4, widget.Elements.GetInteger("/F") & 4);
+
+        // And its appearance is actually drawn inside the box (the signer details are dark text).
+        using var renderer = await PageSmith.Core.Rendering.PdfRenderer.OpenAsync(output);
+        var px = PageSmith.Core.Imaging.ImageIO.ToPixels(await renderer.RenderAsync(1, 72));
+        var dark = 0;
+        for (var y = 652; y < 708; y++)
+        for (var x = 302; x < 518; x++)
+        {
+            var i = (y * px.Width + x) * 4;
+            if (px.Pixels[i] + px.Pixels[i + 1] + px.Pixels[i + 2] < 300) dark++;
+        }
+        Assert.True(dark > 100, $"signature box looks empty ({dark} dark pixels)");
     }
 }
