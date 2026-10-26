@@ -494,22 +494,22 @@
                 <RadioButton
                     Content="Editable text boxes and pictures"
                     IsChecked="{Binding SlidesAsImages, Converter={StaticResource InverseBool}}"
-                    Style="{StaticResource OptionRadio}" />
+                    Margin="0,2,0,6" />
                 <RadioButton
                     Content="Exact look (each page as a picture)"
                     IsChecked="{Binding SlidesAsImages}"
-                    Style="{StaticResource OptionRadio}" />
+                    Margin="0,2,0,6" />
             </StackPanel>
             <StackPanel Visibility="{Binding IsExcel, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Style="{StaticResource OptionHeader}" Text="Layout" />
                 <RadioButton
                     Content="One sheet"
                     IsChecked="{Binding SheetPerPage, Converter={StaticResource InverseBool}}"
-                    Style="{StaticResource OptionRadio}" />
+                    Margin="0,2,0,6" />
                 <RadioButton
                     Content="One sheet per page"
                     IsChecked="{Binding SheetPerPage}"
-                    Style="{StaticResource OptionRadio}" />
+                    Margin="0,2,0,6" />
             </StackPanel>
         </StackPanel>
     </DataTemplate>
@@ -805,11 +805,11 @@
             <RadioButton
                 Content="Over the PDF content"
                 IsChecked="{Binding BelowContent, Converter={StaticResource InverseBool}}"
-                Style="{StaticResource OptionRadio}" />
+                Margin="0,2,0,6" />
             <RadioButton
                 Content="Below the PDF content"
                 IsChecked="{Binding BelowContent}"
-                Style="{StaticResource OptionRadio}" />
+                Margin="0,2,0,6" />
         </StackPanel>
     </DataTemplate>
 
@@ -898,6 +898,82 @@
                     IsChecked="{Binding OutputFormat, Converter={StaticResource EnumEquals}, ConverterParameter=Text}"
                     Style="{StaticResource Segment}" />
             </WrapPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <!--  ============================== Compare  -->
+    <DataTemplate DataType="{x:Type tools:CompareController}">
+        <StackPanel>
+            <TextBlock
+                Style="{StaticResource OptionHint}"
+                Text="Add two PDFs: the original first, then the new version. Drag the cards to change the order."
+                Visibility="{Binding HasPair, Converter={StaticResource BoolToVisibilityInverted}}" />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Compare" />
+            <RadioButton IsChecked="{Binding Overlay, Converter={StaticResource InverseBool}}" Style="{StaticResource OptionCard}">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="Text changes" />
+                    <TextBlock Style="{StaticResource OptionHint}" Text="Words added, removed or changed, highlighted on both versions, with a change report." />
+                </StackPanel>
+            </RadioButton>
+            <RadioButton IsChecked="{Binding Overlay}" Style="{StaticResource OptionCard}">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="Visual overlay" />
+                    <TextBlock Style="{StaticResource OptionHint}" Text="Pages laid over each other to spot changes in pictures, drawings and layout." />
+                </StackPanel>
+            </RadioButton>
+            <StackPanel Visibility="{Binding Overlay, Converter={StaticResource BoolToVisibilityInverted}}">
+                <CheckBox
+                    Margin="0,6,0,0"
+                    Content="Ignore upper and lower case"
+                    IsChecked="{Binding IgnoreCase}" />
+                <CheckBox
+                    Margin="0,6,0,0"
+                    Content="Ignore punctuation"
+                    IsChecked="{Binding IgnorePunctuation}" />
+            </StackPanel>
+            <StackPanel Visibility="{Binding HasPair, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Changes" />
+                <TextBlock Style="{StaticResource OptionHint}" Text="{Binding Summary}" />
+                <ListBox
+                    MaxHeight="380"
+                    Margin="0,4,0,0"
+                    ItemsSource="{Binding Changes}"
+                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                    SelectedItem="{Binding SelectedChange}"
+                    Visibility="{Binding Overlay, Converter={StaticResource BoolToVisibilityInverted}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type tools:ChangeRow}">
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse
+                                    Width="9"
+                                    Height="9"
+                                    Margin="0,5,8,0"
+                                    VerticalAlignment="Top"
+                                    Fill="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock
+                                        FontSize="11"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding KindText}" />
+                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBlock
+                                    Grid.Column="2"
+                                    Margin="8,0,0,0"
+                                    FontSize="11"
+                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                    Text="{Binding Page, StringFormat='p. {0}'}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
         </StackPanel>
     </DataTemplate>
 
