@@ -32,6 +32,7 @@ public partial class App : Application
         }
 
         PdfDocs.EnsureInitialized();
+        WheelScrolling.Register();
         DispatcherUnhandledException += OnUnhandled;
         TaskScheduler.UnobservedTaskException += (_, unobserved) =>
         {
@@ -131,6 +132,11 @@ public partial class App : Application
             }
             await Task.Delay(500);
         }
+        if (args.Wheel is { Length: 2 } wheel)
+        {
+            SimulateWheel(window, (int)wheel[0], (int)wheel[1]);
+            await Task.Delay(800);
+        }
         if (args.Demo && FindTool(window) is { } demo)
         {
             await demo.SeedDemoAsync();
@@ -161,6 +167,29 @@ public partial class App : Application
         await using (var fs = File.Create(args.Snapshot!)) encoder.Save(fs);
         // A snapshot run is a throwaway process: exit at once rather than wait for background work to wind down.
         Environment.Exit(0);
+    }
+
+    /// <summary>
+    /// Development aid: a burst of wheel events over the middle of the window, raised on the element there
+    /// like real ones. A touchpad sends many small deltas before the next layout pass.
+    /// </summary>
+    private static void SimulateWheel(MainWindow window, int delta, int count)
+    {
+        var root = (FrameworkElement)window.Content;
+        if (root.InputHitTest(new Point(root.ActualWidth * 0.5, root.ActualHeight * 0.6)) is not UIElement target) return;
+        for (var i = 0; i < count; i++)
+        {
+            var preview = new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, delta)
+            {
+                RoutedEvent = System.Windows.Input.Mouse.PreviewMouseWheelEvent,
+            };
+            target.RaiseEvent(preview);
+            target.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, delta)
+            {
+                RoutedEvent = System.Windows.Input.Mouse.MouseWheelEvent,
+                Handled = preview.Handled,
+            });
+        }
     }
 
     /// <summary>The tool on screen: one running on the document in front, else the tool page shown on Home.</summary>
@@ -209,6 +238,9 @@ public sealed class CommandLine
     /// <summary>Adds a note with this text near the top of the first page.</summary>
     public string? Note { get; private set; }
 
+    /// <summary>A burst of wheel events in the reader, "delta,count" (a touchpad sends many small ones).</summary>
+    public double[]? Wheel { get; private set; }
+
     public static CommandLine Parse(string[] args)
     {
         var c = new CommandLine();
@@ -236,6 +268,7 @@ public sealed class CommandLine
                 case "--properties": c.Properties = true; break;
                 case "--highlight": c.Highlight = Next(); break;
                 case "--note": c.Note = Next(); break;
+                case "--wheel": c.Wheel = Next().Split(',').Select(v => double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0).ToArray(); break;
                 default:
                     if (File.Exists(args[i])) c.Files.Add(Path.GetFullPath(args[i]));
                     break;

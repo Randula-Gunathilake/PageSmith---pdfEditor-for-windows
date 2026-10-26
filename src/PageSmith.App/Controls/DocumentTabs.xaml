@@ -110,6 +110,7 @@
                 x:Name="TabScroller"
                 HorizontalScrollBarVisibility="Hidden"
                 PreviewMouseWheel="OnTabsWheel"
+                ScrollChanged="OnTabsScrolled"
                 VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal">
                     <ItemsControl x:Name="Tabs" ItemsSource="{Binding Documents}">
