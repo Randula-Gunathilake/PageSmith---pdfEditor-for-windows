@@ -215,7 +215,8 @@ public partial class PageEditor : UserControl
     private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (Keyboard.Modifiers != ModifierKeys.Control) return;
-        Zoom(e.Delta > 0 ? 1.1 : 1 / 1.1);
+        // In proportion to the movement: a touchpad pinch sends many small steps.
+        Zoom(Math.Pow(1.1, e.Delta / 120.0));
         e.Handled = true;
     }
 

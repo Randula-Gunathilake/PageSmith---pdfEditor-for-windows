@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
@@ -84,6 +85,14 @@ public sealed class PdfViewer : UserControl
     private Point _panStartOffset;
     private (int Page, Point Point)? _pressAt;
     private PageLink? _pressLink;
+    private HwndSource? _hwnd;
+
+    /// <summary>
+    /// Offsets asked for but not applied yet. A scroll view moves at its next layout pass and reports its
+    /// old offset until then; a touchpad sends many small wheel events in between, so each one continues
+    /// from here rather than from the stale offset (which kept only the last event of a burst).
+    /// </summary>
+    private double? _pendingX, _pendingY;
     private ILookup<int, PageLink> _links = Array.Empty<PageLink>().ToLookup(l => l.PageIndex);
     private ViewerTool _tool;
 
@@ -106,8 +115,22 @@ public sealed class PdfViewer : UserControl
 
         _scroll.ScrollChanged += (_, e) =>
         {
+            // The scroll view has caught up with the offsets asked for.
+            _pendingX = _pendingY = null;
             if (e.ViewportWidthChange != 0) RecenterPages();
             UpdateVisible();
+        };
+        // Sideways touchpad scrolling arrives as WM_MOUSEHWHEEL, which WPF doesn't turn into an event.
+        Loaded += (_, _) =>
+        {
+            if (_hwnd != null) return;
+            _hwnd = PresentationSource.FromVisual(this) as HwndSource;
+            _hwnd?.AddHook(OnWindowMessage);
+        };
+        Unloaded += (_, _) =>
+        {
+            _hwnd?.RemoveHook(OnWindowMessage);
+            _hwnd = null;
         };
         SizeChanged += (_, _) =>
         {
@@ -201,6 +224,27 @@ public sealed class PdfViewer : UserControl
 
     private double ViewportHeight => _scroll.ViewportHeight > 0 ? _scroll.ViewportHeight : ActualHeight;
 
+    /// <summary>Where the view is, or is about to be.</summary>
+    private double OffsetX => _pendingX ?? _scroll.HorizontalOffset;
+
+    private double OffsetY => _pendingY ?? _scroll.VerticalOffset;
+
+    private double MaxOffsetX => Math.Max(0, (double.IsNaN(_canvas.Width) ? 0 : _canvas.Width) - ViewportWidth);
+
+    private double MaxOffsetY => Math.Max(0, (double.IsNaN(_canvas.Height) ? 0 : _canvas.Height) - ViewportHeight);
+
+    private void ScrollToX(double x)
+    {
+        _pendingX = Math.Clamp(x, 0, MaxOffsetX);
+        _scroll.ScrollToHorizontalOffset(_pendingX.Value);
+    }
+
+    private void ScrollToY(double y)
+    {
+        _pendingY = Math.Clamp(y, 0, MaxOffsetY);
+        _scroll.ScrollToVerticalOffset(_pendingY.Value);
+    }
+
     /// <summary>The current version's text, once it has been read (see <see cref="DocumentSession.GetTextAsync"/>).</summary>
     private TextIndex? Text => _session?.GetTextAsync() is { IsCompletedSuccessfully: true } t ? t.Result : null;
 
@@ -239,7 +283,7 @@ public sealed class PdfViewer : UserControl
         Relayout();
         _scroll.UpdateLayout();
         if (anchor is { } a) RestoreAnchor(a);
-        else _scroll.ScrollToVerticalOffset(0);
+        else ScrollToY(0);
         _ = _session?.GetTextAsync();
         UpdateVisible();
         if (hadSelection) SelectionChanged?.Invoke(this, EventArgs.Empty);
@@ -248,7 +292,7 @@ public sealed class PdfViewer : UserControl
 
     private (int Page, double Y) CaptureAnchor()
     {
-        var y = _scroll.VerticalOffset;
+        var y = OffsetY;
         var page = PageAt(y);
         return (page, (y - _tops[page]) / Scale);
     }
@@ -257,7 +301,7 @@ public sealed class PdfViewer : UserControl
     {
         if (_tops.Length == 0) return;
         var page = Math.Min(anchor.Page, _tops.Length - 1);
-        _scroll.ScrollToVerticalOffset(_tops[page] + anchor.Y * Scale);
+        ScrollToY(_tops[page] + anchor.Y * Scale);
     }
 
     private void Relayout()
@@ -313,7 +357,7 @@ public sealed class PdfViewer : UserControl
             return;
         }
         var height = ViewportHeight;
-        var top = _scroll.VerticalOffset;
+        var top = OffsetY;
         var first = PageAt(top - height * 0.5);
         var last = PageAt(top + height * 1.5);
         foreach (var index in _views.Keys.Where(i => i < first || i > last).ToList())
@@ -344,8 +388,8 @@ public sealed class PdfViewer : UserControl
         var page = 0;
         if (_tops.Length > 0)
         {
-            if (_scroll.ScrollableHeight > 0 && _scroll.VerticalOffset >= _scroll.ScrollableHeight - 1) page = _tops.Length - 1;
-            else if (_scroll.VerticalOffset > 1) page = PageAt(_scroll.VerticalOffset + ViewportHeight * 0.35);
+            if (MaxOffsetY > 0 && OffsetY >= MaxOffsetY - 1) page = _tops.Length - 1;
+            else if (OffsetY > 1) page = PageAt(OffsetY + ViewportHeight * 0.35);
         }
         if (page == _currentPage) return;
         _currentPage = page;
@@ -374,7 +418,7 @@ public sealed class PdfViewer : UserControl
 
     private PageView? NextToRender()
     {
-        var center = _scroll.VerticalOffset + ViewportHeight / 2;
+        var center = OffsetY + ViewportHeight / 2;
         PageView? best = null;
         var bestDistance = double.MaxValue;
         foreach (var v in _views.Values)
@@ -507,8 +551,8 @@ public sealed class PdfViewer : UserControl
         }
         var a = anchor ?? new Point(ViewportWidth / 2, ViewportHeight / 2);
         var oldScale = Scale;
-        var cx = _scroll.HorizontalOffset + a.X;
-        var cy = _scroll.VerticalOffset + a.Y;
+        var cx = OffsetX + a.X;
+        var cy = OffsetY + a.Y;
         var page = PageAt(cy);
         var py = (cy - _tops[page]) / oldScale;
         var px = (cx - PageLeft(page, oldScale)) / oldScale;
@@ -516,8 +560,8 @@ public sealed class PdfViewer : UserControl
         Relayout();
         _scroll.UpdateLayout();
         var scale = Scale;
-        _scroll.ScrollToVerticalOffset(_tops[page] + py * scale - a.Y);
-        _scroll.ScrollToHorizontalOffset(PageLeft(page, scale) + px * scale - a.X);
+        ScrollToY(_tops[page] + py * scale - a.Y);
+        ScrollToX(PageLeft(page, scale) + px * scale - a.X);
         UpdateVisible();
         ZoomChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -526,7 +570,7 @@ public sealed class PdfViewer : UserControl
     {
         if (_tops.Length == 0) return;
         index = Math.Clamp(index, 0, _tops.Length - 1);
-        _scroll.ScrollToVerticalOffset(Math.Max(0, _tops[index] - Gap / 2));
+        ScrollToY(_tops[index] - Gap / 2);
         // Show the new page number at once, before the scroll has been laid out.
         if (_currentPage != index)
         {
@@ -544,10 +588,10 @@ public sealed class PdfViewer : UserControl
     {
         var scale = Scale;
         var r = new Rect(PageLeft(page, scale) + box.X * scale, _tops[page] + box.Y * scale, box.Width * scale, box.Height * scale);
-        if (r.Top < _scroll.VerticalOffset + 8 || r.Bottom > _scroll.VerticalOffset + ViewportHeight - 8)
-            _scroll.ScrollToVerticalOffset(r.Top - ViewportHeight / 3);
-        if (r.Left < _scroll.HorizontalOffset || r.Right > _scroll.HorizontalOffset + ViewportWidth)
-            _scroll.ScrollToHorizontalOffset(r.Left - ViewportWidth / 3);
+        if (r.Top < OffsetY + 8 || r.Bottom > OffsetY + ViewportHeight - 8)
+            ScrollToY(r.Top - ViewportHeight / 3);
+        if (r.Left < OffsetX || r.Right > OffsetX + ViewportWidth)
+            ScrollToX(r.Left - ViewportWidth / 3);
     }
 
     // ------------------------------------------------------------------ search matches
@@ -758,7 +802,7 @@ public sealed class PdfViewer : UserControl
     /// <summary>Development aid for --snapshot: a drag between two viewer points, through the same steps as the mouse.</summary>
     internal void SimulateDrag(Point from, Point to)
     {
-        var offset = new Vector(_scroll.HorizontalOffset, _scroll.VerticalOffset);
+        var offset = new Vector(OffsetX, OffsetY);
         Press(from + offset, 1);
         for (var i = 1; i <= 8; i++) DragTo(from + (to - from) * (i / 8.0) + offset);
         Release();
@@ -774,7 +818,7 @@ public sealed class PdfViewer : UserControl
     {
         _drag = Drag.Pan;
         _dragStart = e.GetPosition(this);
-        _panStartOffset = new Point(_scroll.HorizontalOffset, _scroll.VerticalOffset);
+        _panStartOffset = new Point(OffsetX, OffsetY);
         _canvas.Cursor = Cursors.SizeAll;
         _canvas.CaptureMouse();
         e.Handled = true;
@@ -792,8 +836,8 @@ public sealed class PdfViewer : UserControl
         {
             case Drag.Pan:
                 var delta = e.GetPosition(this) - _dragStart;
-                _scroll.ScrollToHorizontalOffset(_panStartOffset.X - delta.X);
-                _scroll.ScrollToVerticalOffset(_panStartOffset.Y - delta.Y);
+                ScrollToX(_panStartOffset.X - delta.X);
+                ScrollToY(_panStartOffset.Y - delta.Y);
                 break;
             case Drag.Pending:
                 DragTo(pos);
@@ -833,8 +877,8 @@ public sealed class PdfViewer : UserControl
         var p = Mouse.GetPosition(_scroll);
         var dy = p.Y < 0 ? p.Y : p.Y > ViewportHeight ? p.Y - ViewportHeight : 0;
         var dx = p.X < 0 ? p.X : p.X > ViewportWidth ? p.X - ViewportWidth : 0;
-        _scroll.ScrollToVerticalOffset(_scroll.VerticalOffset + Math.Clamp(dy, -60, 60));
-        _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset + Math.Clamp(dx, -60, 60));
+        ScrollToY(OffsetY + Math.Clamp(dy, -60, 60));
+        ScrollToX(OffsetX + Math.Clamp(dx, -60, 60));
         ExtendSelection(Mouse.GetPosition(_canvas));
     }
 
@@ -902,22 +946,43 @@ public sealed class PdfViewer : UserControl
         if (_canvas.IsMouseCaptured) _canvas.ReleaseMouseCapture();
     }
 
+    /// <summary>
+    /// Scrolls by as much as the wheel or touchpad moved: a wheel notch is 120, a touchpad sends many smaller
+    /// steps. Ctrl zooms (a touchpad pinch arrives as Ctrl + wheel), Shift scrolls sideways.
+    /// </summary>
     private void OnWheel(object sender, MouseWheelEventArgs e)
     {
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
-        {
             SetZoom(_zoom * Math.Pow(1.1, e.Delta / 120.0), e.GetPosition(_scroll));
-        }
         else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
-        {
-            _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset - e.Delta);
-        }
+            ScrollToX(OffsetX - WheelDistance(e.Delta, ViewportWidth));
         else
-        {
-            // A notch moves about a hand's width of text, more than the default three lines.
-            _scroll.ScrollToVerticalOffset(_scroll.VerticalOffset - e.Delta * 0.9);
-        }
+            ScrollToY(OffsetY - WheelDistance(e.Delta, ViewportHeight));
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// How far a wheel delta scrolls, following Windows' "lines to scroll" setting. A line here is a bit
+    /// over two lines of text at 100 %, so the default three lines move about a hand's width per notch;
+    /// "a screen at a time" scrolls most of the view.
+    /// </summary>
+    private static double WheelDistance(int delta, double viewport)
+    {
+        var lines = SystemParameters.WheelScrollLines;
+        var notch = lines > 0 ? lines * 36.0 : viewport * 0.9;
+        return delta / 120.0 * notch;
+    }
+
+    /// <summary>Sideways scrolling (two fingers across a touchpad, or a tilting wheel) over the pages.</summary>
+    private IntPtr OnWindowMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WmMouseHWheel = 0x020E;
+        if (msg != WmMouseHWheel || !IsVisible || !_scroll.IsMouseOver) return IntPtr.Zero;
+        // The high word of wParam is the delta; positive means to the right.
+        var delta = (short)((wParam.ToInt64() >> 16) & 0xFFFF);
+        ScrollToX(OffsetX + WheelDistance(delta, ViewportWidth));
+        handled = true;
+        return new IntPtr(1);
     }
 
     private async void OnKey(object sender, KeyEventArgs e)
@@ -939,10 +1004,10 @@ public sealed class PdfViewer : UserControl
                 GoToPage(0);
                 break;
             case Key.End when !ctrl:
-                _scroll.ScrollToBottom();
+                ScrollToY(MaxOffsetY);
                 break;
             case Key.Space:
-                _scroll.ScrollToVerticalOffset(_scroll.VerticalOffset + (shift ? -1 : 1) * ViewportHeight * 0.9);
+                ScrollToY(OffsetY + (shift ? -1 : 1) * ViewportHeight * 0.9);
                 break;
             case Key.Left when !ctrl && _scroll.ScrollableWidth <= 0:
                 PreviousPage();

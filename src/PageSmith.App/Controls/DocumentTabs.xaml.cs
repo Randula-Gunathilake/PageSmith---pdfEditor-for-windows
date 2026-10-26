@@ -121,11 +121,18 @@ public partial class DocumentTabs : UserControl
         if (MenuSession(sender)?.FilePath is { } path) Clipboard.SetText(path);
     }
 
+    /// <summary>The wheel scrolls the tabs sideways; small touchpad steps add up until the strip catches up.</summary>
     private void OnTabsWheel(object sender, MouseWheelEventArgs e)
     {
-        TabScroller.ScrollToHorizontalOffset(TabScroller.HorizontalOffset - e.Delta / 2.0);
+        var from = _tabsTarget ?? TabScroller.HorizontalOffset;
+        _tabsTarget = Math.Clamp(from - e.Delta / 2.0, 0, TabScroller.ScrollableWidth);
+        TabScroller.ScrollToHorizontalOffset(_tabsTarget.Value);
         e.Handled = true;
     }
+
+    private double? _tabsTarget;
+
+    private void OnTabsScrolled(object sender, ScrollChangedEventArgs e) => _tabsTarget = null;
 
     private void OnDragOver(object sender, DragEventArgs e)
     {
