@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <Product>PageSmith</Product>
     <Company>PageSmith</Company>
     <Copyright>© 2026 PageSmith contributors</Copyright>
