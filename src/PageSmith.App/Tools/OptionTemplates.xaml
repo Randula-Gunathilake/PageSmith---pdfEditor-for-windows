@@ -382,6 +382,80 @@
         </StackPanel>
     </DataTemplate>
 
+    <DataTemplate DataType="{x:Type tools:ScanController}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource OptionHint}" Text="Scan pages, photograph them or add photos, then put them in order. Each image becomes a page." />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Colour" />
+            <WrapPanel>
+                <RadioButton
+                    Content="Colour"
+                    GroupName="ScanColor"
+                    IsChecked="{Binding ColorMode, Converter={StaticResource EnumEquals}, ConverterParameter=Color}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Greyscale"
+                    GroupName="ScanColor"
+                    IsChecked="{Binding ColorMode, Converter={StaticResource EnumEquals}, ConverterParameter=Grayscale}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Black &amp; white"
+                    GroupName="ScanColor"
+                    IsChecked="{Binding ColorMode, Converter={StaticResource EnumEquals}, ConverterParameter=BlackAndWhite}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <TextBlock Style="{StaticResource OptionHint}" Text="Black &amp; white evens out shadows and makes text crisp, which suits photos of paper." />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Page orientation" />
+            <WrapPanel>
+                <RadioButton
+                    Content="Portrait"
+                    GroupName="ScanOrientation"
+                    IsChecked="{Binding Orientation, Converter={StaticResource EnumEquals}, ConverterParameter=Portrait}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Landscape"
+                    GroupName="ScanOrientation"
+                    IsChecked="{Binding Orientation, Converter={StaticResource EnumEquals}, ConverterParameter=Landscape}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Auto"
+                    GroupName="ScanOrientation"
+                    IsChecked="{Binding Orientation, Converter={StaticResource EnumEquals}, ConverterParameter=Auto}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Page size" />
+            <ComboBox SelectedValue="{Binding PageSize}" SelectedValuePath="Tag">
+                <ComboBoxItem Content="Fit (same size as the image)" Tag="Fit" />
+                <ComboBoxItem Content="A4 (297 × 210 mm)" Tag="A4" />
+                <ComboBoxItem Content="US Letter (215.9 × 279.4 mm)" Tag="Letter" />
+                <ComboBoxItem Content="US Legal (215.9 × 355.6 mm)" Tag="Legal" />
+                <ComboBoxItem Content="A3 (420 × 297 mm)" Tag="A3" />
+                <ComboBoxItem Content="A5 (210 × 148 mm)" Tag="A5" />
+            </ComboBox>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Margin" />
+            <WrapPanel>
+                <RadioButton
+                    Content="No margin"
+                    GroupName="ScanMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=None}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Small"
+                    GroupName="ScanMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=Small}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Big"
+                    GroupName="ScanMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=Big}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <CheckBox
+                Margin="0,12,0,0"
+                Content="Put all pages in one PDF"
+                IsChecked="{Binding MergeIntoOne}" />
+        </StackPanel>
+    </DataTemplate>
+
     <DataTemplate DataType="{x:Type tools:OfficeToPdfController}">
         <StackPanel>
             <TextBlock Style="{StaticResource OptionHeader}" Text="Conversion engine" />

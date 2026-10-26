@@ -11,6 +11,4 @@ public abstract class PendingController(string toolId) : ToolController(toolId)
         throw new UserFacingException($"{Descriptor.Title} is still being built and will arrive in the next update. See TODO.md for its status.");
 }
 
-public sealed class ScanController() : PendingController("scan");
-
 public sealed class HtmlToPdfController() : PendingController("html-to-pdf");
