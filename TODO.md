@@ -11,7 +11,7 @@ offline desktop app that works on the open document. This file tracks:
 For the iLovePDF research behind the feature list (plans, every tool's options, the Free vs
 Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 
-**Current version:** 0.3.0 (preview), last updated 2026-10-27.
+**Current version:** 0.3.1 (preview), last updated 2026-10-27.
 
 ---
 
@@ -179,6 +179,19 @@ and every tool works on the document in front of you.
 - **Errors** are logged to `%APPDATA%\PageSmith\pagesmith.log` and shown in-app, never as crash dialogs.
 
 ### 1.4 Fixed since 0.1.0
+
+- **Touchpad and wheel scrolling (0.3.1).**
+  - In the reader, a touchpad barely scrolled. A touchpad sends many small scroll steps between two
+    screen updates, and each step started from the old position, so only the last one counted. The
+    steps now add up, and a touchpad scrolls as far as your fingers move.
+  - Home, Settings, Workflows and About didn't scroll with the wheel or a touchpad at all; only the
+    scroll bar worked. Their content sits in the navigation pane's scroll area, and an inner scroll
+    area with nothing to scroll swallowed every wheel step. Steps now pass on to the area around.
+  - Everywhere else, WPF scrolled three lines per touchpad step, however small, so lists raced. Each
+    step now scrolls in proportion to the movement; a mouse-wheel notch still scrolls three lines and
+    follows Windows' *lines to scroll* setting.
+  - In the reader, sideways two-finger scrolling (when zoomed in) and pinch to zoom now work smoothly,
+    and pinch zoom in the page editors follows the size of the pinch.
 
 - **Window size (0.2.1).** The window always opened at 1360 × 880, which is taller than the
   usable screen on common laptops (for example 1920 × 1080 at 125% scaling leaves 1536 × 816),
@@ -354,7 +367,7 @@ git clone https://github.com/Randula-Gunathilake/PageSmith---pdfEditor-for-windo
 cd PageSmith
 ```
 
-- `main` holds released versions; the newest is tagged `v0.3.0`.
+- `main` holds released versions; the newest is tagged `v0.3.1`.
 - `develop` has the latest integrated work.
 
 To build the newest code:
@@ -508,6 +521,9 @@ it; nothing needs installing.
       `--note "text"` adds a note on page 1;
     - `--panel pages|bookmarks|comments|none` picks the side panel, `--properties` opens the
       properties dialog;
+    - `--wheel -15,20` sends 20 wheel steps of −15 (a touchpad burst; −120 is a mouse notch) to
+      whatever is in the middle of the window, on any page, through the same routed events as real
+      ones;
     - `--doc-tool rotate` opens a tool on the document; add `--run` (and `--demo`) to run it,
       which replaces the document like the real button does.
 
@@ -537,6 +553,10 @@ it; nothing needs installing.
   - *Settings → Opening PDFs* writes only under `HKEY_CURRENT_USER`: the `PageSmith.Document`
     ProgID, `.pdf\OpenWithProgids`, `Applications\PageSmith.exe`, `Software\PageSmith\Capabilities`
     and `RegisteredApplications`. *Remove* deletes them again.
+- **Wheel and touchpad scrolling** for every scroll view is handled in
+  `Infrastructure/WheelScrolling.cs` (registered at start-up); the reader's page view does its own in
+  `PdfViewer.OnWheel`. Scroll views apply a new offset at their next layout pass, so code that scrolls
+  several times in a row must continue from the offset it last asked for, not `VerticalOffset`.
 - **The reader's rendering** uses `Windows.Data.Pdf` through `PdfRenderer`, which serializes
   renders. Disposing a renderer waits for a render in progress, so a viewer can swap renderers
   when the document changes. Text for find and selection comes from `TextIndex` (PdfPig), read
