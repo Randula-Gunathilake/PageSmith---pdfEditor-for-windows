@@ -540,6 +540,154 @@
         </StackPanel>
     </DataTemplate>
 
+    <!--  ============================== Redact PDF  -->
+
+    <DataTemplate DataType="{x:Type tools:RedactController}">
+        <StackPanel>
+            <TextBlock
+                Style="{StaticResource NoDocumentHint}"
+                Text="Add a PDF, then mark the text, pictures or areas to hide. Redacted content is removed from the file for good, not just covered."
+                Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
+            <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{StaticResource OptionHint}" Text="Drag over areas or click words on the page, or let PageSmith find them. Check the list, then press Redact PDF." />
+
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Search" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ui:TextBox PlaceholderText="Word, phrase or pattern" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                    <ui:Button
+                        Grid.Column="1"
+                        Margin="6,0,0,0"
+                        Command="{Binding SearchCommand}"
+                        Content="Mark"
+                        ToolTip="Mark every match in the document">
+                        <ui:Button.Icon>
+                            <ui:SymbolIcon Symbol="Search24" />
+                        </ui:Button.Icon>
+                    </ui:Button>
+                </Grid>
+                <WrapPanel Margin="0,6,0,0">
+                    <CheckBox
+                        Margin="0,0,14,0"
+                        Content="Match case"
+                        IsChecked="{Binding MatchCase}" />
+                    <CheckBox
+                        Margin="0,0,14,0"
+                        Content="Whole words"
+                        IsChecked="{Binding WholeWord}" />
+                    <CheckBox Content="Regular expression" IsChecked="{Binding UseRegex}" />
+                </WrapPanel>
+
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Personal information" />
+                <ItemsControl ItemsSource="{Binding Patterns}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type tools:PatternChoice}">
+                            <CheckBox
+                                Margin="0,0,14,4"
+                                Content="{Binding Label}"
+                                IsChecked="{Binding Selected}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ui:Button
+                    Margin="0,4,0,0"
+                    Command="{Binding FindPatternsCommand}"
+                    Content="Find and mark">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="Wand24" />
+                    </ui:Button.Icon>
+                </ui:Button>
+
+                <Grid Margin="0,14,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Text="Marked" />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="{Binding MarksSummary}" />
+                    </StackPanel>
+                    <ui:Button
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Appearance="Transparent"
+                        Command="{Binding ClearMarksCommand}"
+                        Content="Clear all" />
+                </Grid>
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Marks}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type editor:RedactItem}">
+                                <Grid Margin="0,0,0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:Button
+                                        Padding="8,4"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Appearance="Transparent"
+                                        Command="{Binding DataContext.GoToMarkCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Show on the page">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border
+                                                Width="10"
+                                                Height="10"
+                                                Margin="0,0,8,0"
+                                                Background="Black" />
+                                            <TextBlock
+                                                MaxWidth="230"
+                                                Text="{Binding Description}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                Margin="6,0,0,0"
+                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                Text="{Binding PageIndex, StringFormat='p. {0}', Converter={StaticResource PageNumber}}" />
+                                        </StackPanel>
+                                    </ui:Button>
+                                    <ui:Button
+                                        Grid.Column="1"
+                                        Padding="6,4"
+                                        Appearance="Transparent"
+                                        Command="{Binding DataContext.RemoveMarkCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="Don't redact this">
+                                        <ui:Button.Icon>
+                                            <ui:SymbolIcon Symbol="Dismiss24" />
+                                        </ui:Button.Icon>
+                                    </ui:Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Box colour" />
+                <controls:ColorPicker Color="{Binding FillColor}" />
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Text in each box (optional)" />
+                <ui:TextBox PlaceholderText="e.g. REDACTED" Text="{Binding OverlayText, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox
+                    Margin="0,10,0,0"
+                    Content="Also remove the title, author and keywords"
+                    IsChecked="{Binding RemoveMetadata}" />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Pages with marks are rebuilt as images with the boxes burnt in, so hidden text, pictures and drawings are really gone. The rest of the text stays searchable." />
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+
     <!--  ============================== PDF Forms  -->
 
     <DataTemplate DataType="{x:Type tools:FormsController}">

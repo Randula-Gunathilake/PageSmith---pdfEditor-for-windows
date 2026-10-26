@@ -16,6 +16,7 @@
     <infra:FileNameConverter x:Key="FileName" />
     <infra:FolderOfConverter x:Key="FolderOf" />
     <infra:ScaleConverter x:Key="PageHeight" Factor="1.3" Offset="-16" />
+    <infra:PageNumberConverter x:Key="PageNumber" />
 
     <!--  A card-like surface for the main areas of a page.  -->
     <Style x:Key="Surface" TargetType="Border">

@@ -15,6 +15,4 @@ public sealed class ScanController() : PendingController("scan");
 
 public sealed class HtmlToPdfController() : PendingController("html-to-pdf");
 
-public sealed class RedactController() : PendingController("redact");
-
 public sealed class CompareController() : PendingController("compare");
