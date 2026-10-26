@@ -23,6 +23,7 @@ public partial class App : Application
         };
 
         var args = CommandLine.Parse(e.Args);
+        AppServices.IsSnapshotRun = args.Snapshot != null;
         if (args.Theme != null) AppServices.Settings.Theme = args.Theme.Value;
         if (args.Snapshot != null)
         {
@@ -36,6 +37,7 @@ public partial class App : Application
         MainWindow = window;
         if (args.Width > 0 && args.Height > 0)
         {
+            window.WindowState = WindowState.Normal;
             window.Width = args.Width;
             window.Height = args.Height;
         }

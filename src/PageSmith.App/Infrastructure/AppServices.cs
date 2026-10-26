@@ -28,8 +28,15 @@ public static class AppServices
     /// <summary>A folder chosen with the "Ask each time" output setting, valid for the current run.</summary>
     private static string? _askedFolder;
 
+    /// <summary>
+    /// True for --snapshot runs (screenshots and automated checks). They must leave no trace in the user's
+    /// settings: no theme, recent files or window position.
+    /// </summary>
+    public static bool IsSnapshotRun { get; set; }
+
     public static void SaveSettings()
     {
+        if (IsSnapshotRun) return;
         try { Settings.Save(); } catch (Exception ex) { LogError(ex); }
     }
 

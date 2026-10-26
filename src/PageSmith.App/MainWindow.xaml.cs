@@ -15,6 +15,12 @@ public partial class MainWindow : FluentWindow
     public MainWindow()
     {
         InitializeComponent();
+        WindowSizing.Apply(this, AppServices.Settings.Window);
+        Closing += (_, _) =>
+        {
+            AppServices.Settings.Window = WindowSizing.Capture(this);
+            AppServices.SaveSettings();
+        };
         AppServices.Window = this;
         AppServices.Navigation = Nav;
         AppServices.Snackbars = Snackbars;
