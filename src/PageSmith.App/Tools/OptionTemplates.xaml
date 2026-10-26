@@ -456,6 +456,90 @@
         </StackPanel>
     </DataTemplate>
 
+    <DataTemplate DataType="{x:Type tools:HtmlToPdfController}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Screen size" />
+            <ComboBox
+                DisplayMemberPath="Label"
+                ItemsSource="{Binding ScreenWidths}"
+                SelectedItem="{Binding ScreenWidth}" />
+            <TextBlock Style="{StaticResource OptionHint}" Text="The page is laid out as it looks on a screen this wide." />
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Page size" />
+            <WrapPanel>
+                <RadioButton
+                    Content="A4"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=A4}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="A3"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=A3}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="A5"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=A5}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Letter"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=Letter}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="One long page"
+                    GroupName="WebPageSize"
+                    IsChecked="{Binding PageSize, Converter={StaticResource EnumEquals}, ConverterParameter=OneLongPage}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <StackPanel Visibility="{Binding IsOneLongPage, Converter={StaticResource BoolToVisibilityInverted}}">
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Orientation" />
+                <WrapPanel>
+                    <RadioButton
+                        Content="Portrait"
+                        GroupName="WebOrientation"
+                        IsChecked="{Binding Landscape, Converter={StaticResource InverseBool}}"
+                        Style="{StaticResource Segment}" />
+                    <RadioButton
+                        Content="Landscape"
+                        GroupName="WebOrientation"
+                        IsChecked="{Binding Landscape}"
+                        Style="{StaticResource Segment}" />
+                </WrapPanel>
+            </StackPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Margin" />
+            <WrapPanel>
+                <RadioButton
+                    Content="No margin"
+                    GroupName="WebMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=None}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Small"
+                    GroupName="WebMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=Small}"
+                    Style="{StaticResource Segment}" />
+                <RadioButton
+                    Content="Big"
+                    GroupName="WebMargin"
+                    IsChecked="{Binding Margin, Converter={StaticResource EnumEquals}, ConverterParameter=Big}"
+                    Style="{StaticResource Segment}" />
+            </WrapPanel>
+            <CheckBox
+                Margin="0,12,0,0"
+                Content="Block ads"
+                IsChecked="{Binding BlockAds}" />
+            <CheckBox
+                Margin="0,8,0,0"
+                Content="Remove pop-ups and cookie banners"
+                IsChecked="{Binding RemovePopups}" />
+            <CheckBox
+                Margin="0,8,0,0"
+                Content="Keep background colours and pictures"
+                IsChecked="{Binding Backgrounds}" />
+        </StackPanel>
+    </DataTemplate>
+
     <DataTemplate DataType="{x:Type tools:OfficeToPdfController}">
         <StackPanel>
             <TextBlock Style="{StaticResource OptionHeader}" Text="Conversion engine" />

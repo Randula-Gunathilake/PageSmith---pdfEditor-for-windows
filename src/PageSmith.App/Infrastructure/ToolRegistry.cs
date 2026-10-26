@@ -97,8 +97,8 @@ public static class ToolRegistry
         _ => SymbolRegular.Sparkle24,
     };
 
-    /// <summary>Tools still on placeholder controllers (see PendingControllers.cs and TODO.md).</summary>
-    public static readonly HashSet<string> InProgressIds = ["html-to-pdf"];
+    /// <summary>Tools whose screens are still being built (none at the moment); they show an "In progress" chip.</summary>
+    public static readonly HashSet<string> InProgressIds = [];
 
     private const string Red = "#E5484D", Green = "#46A758", Blue = "#3E63DD", Purple = "#8E4EC6", Orange = "#F76B15", Teal = "#12A594", Gold = "#D9A400", Indigo = "#6E56CF";
 
