@@ -1,7 +1,8 @@
 # PageSmith — status, roadmap and build guide
 
-PageSmith is a native Windows 11 PDF toolbox that recreates every tool of the iLovePDF web app,
-Free and Premium tiers, as an offline desktop app. This file tracks:
+PageSmith is a native Windows 11 PDF reader and toolbox. It opens PDFs in tabs like Adobe
+Acrobat, and it recreates every tool of the iLovePDF web app, Free and Premium tiers, as an
+offline desktop app that works on the open document. This file tracks:
 
 - what works today;
 - what is left for v1.0 and the machine-learning v2.0;
@@ -10,7 +11,7 @@ Free and Premium tiers, as an offline desktop app. This file tracks:
 For the iLovePDF research behind the feature list (plans, every tool's options, the Free vs
 Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 
-**Current version:** 0.2.1 (preview), last updated 2026-10-26.
+**Current version:** 0.3.0 (preview), last updated 2026-10-27.
 
 ---
 
@@ -19,9 +20,10 @@ Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 | Area | State |
 |---|---|
 | iLovePDF analysis | Done: 34 features (33 tools + Workflows), Free vs Premium limits, mapping → [docs/FEATURES.md](docs/FEATURES.md) |
-| PDF engine (`PageSmith.Core`) | Done for all 33 tools; 82 automated tests, all passing |
+| PDF engine (`PageSmith.Core`) | Done for all 33 tools and the reader; 96 automated tests, all passing |
 | Windows app (`PageSmith.App`) | **All 33 tool screens working**, plus Home, Workflows, Settings and About |
-| Still to check by hand | A real scanner, a real camera, and *Retry* with the PC actually offline (§2.1) |
+| PDF reader (new in 0.3.0) | **Working:** documents in tabs, viewer, find, text selection, comments, print, and every PDF tool on the open document with undo (§1.2) |
+| Still to check by hand | A real scanner, a real camera, a real printer, *Retry* with the PC actually offline, and opening PDFs from Explorer (§2.1) |
 | Machine-learning features | Planned for v2.0 (§4) |
 | Packaging | Self-contained single-file `.exe` and zip via `scripts/publish.ps1`; no installer yet |
 
@@ -76,7 +78,71 @@ How the tools were checked:
 Not included: iLovePDF's *request signatures from other people*. It needs an online service
 that sends emails and stores documents, which goes against PageSmith running on your PC.
 
-### 1.2 Things that work across the app
+### 1.2 The reader (new in 0.3.0)
+
+PageSmith opens documents the way Adobe Acrobat does: each one in its own tab, ready to read,
+and every tool works on the document in front of you.
+
+- **Opening documents.**
+  - **Open** button, **Ctrl+O**, the **+** next to the tabs, Home's *Open a file* and *Recent
+    documents*, dropping files on the window or the tab strip, or `PageSmith.exe file.pdf`.
+  - **One window:** opening a PDF from Explorer while PageSmith runs adds a tab to the open
+    window instead of starting a second copy.
+  - **Settings → Opening PDFs** adds PageSmith to Windows' *Open with* list for PDFs, then opens
+    Windows' *Default apps* page, where you can make it the default PDF app. Windows doesn't let
+    apps make themselves the default, so that last click is yours.
+  - **Images, Word, Excel, PowerPoint and web pages** open as new PDFs, unsaved until you save
+    them. Password-protected PDFs ask for their password.
+  - Opening a file that is already open just switches to its tab.
+- **Tabs.**
+  - Home (every tool, Workflows, Settings) is the first tab, then one tab per document.
+  - A dot marks unsaved changes; the window title shows it too.
+  - Close with ×, a middle click or **Ctrl+W**. Switch with a click, **Ctrl+Tab** or
+    **Ctrl+PgUp/PgDn**.
+  - Right-click a tab: close, close others, close all, show in folder, copy the file path.
+  - Closing a tab or the window with unsaved changes asks *Save*, *Don't save* or *Cancel*.
+- **Viewer.**
+  - All pages in one continuous scroll. Only pages in or near the view are rendered, and they are
+    re-rendered sharp after zooming, so 300-page documents open and scroll quickly.
+  - Zoom: **Ctrl + mouse wheel** (around the pointer), **Ctrl +/−**, the zoom box (type any
+    percentage), *Fit width* (**Ctrl+2**), *Fit page* (**Ctrl+0**), actual size (**Ctrl+1**).
+  - Page box (**Ctrl+G**), previous/next page, Home/End, Space, Page Up/Down.
+  - *Select* tool: drag to select text in reading order (columns first, then lines), across pages
+    too. Double-click selects a word. **Ctrl+A** selects all, **Ctrl+C** copies.
+  - *Hand* tool (or hold Space, or drag with the middle button) moves the pages around.
+  - **Links** work: links inside the document go to their page; web and e-mail links show where
+    they go and ask before opening. Other kinds of links are not opened.
+- **Side panels.**
+  - **Pages:** thumbnails that follow the page you're reading. Right-click for *Rotate*, *Delete*,
+    *Extract to a new tab*, *Insert pages from a file* and *Insert a blank page*. Drag thumbnails
+    to move pages. Drop PDFs or images on the thumbnails to insert them at that spot.
+  - **Bookmarks:** the document's outline; click to go there.
+  - **Comments:** every highlight, note, drawing and other comment, with author and date. Click
+    one to jump to it, press Delete to remove it.
+- **Find (Ctrl+F).** Searches the whole document in the background. Shows *n of N*, highlights
+  every match, with Enter/Shift+Enter or F3/Shift+F3 to move between them. *Match case* and
+  *Whole words* options. A scan with no text offers *Make it searchable (OCR)*.
+- **Comments.**
+  - Right-click selected text: **Highlight**, **Underline**, **Strikethrough** or **Redact**.
+  - The *Add a note* tool on the toolbar, or right-click → *Add a note here*, places a sticky note.
+  - All of them are standard PDF annotations that other PDF readers show too. Hover one to read it.
+- **Every tool on the open document.** The **All tools** pane (with search) lists every PDF tool.
+  - Tools that change the document (Merge, Remove/Organize pages, Compress, Repair, OCR, PDF/A,
+    Rotate, Page numbers, Watermark, Crop, Edit, Forms, Unlock, Protect, Sign, Redact) replace it
+    in its tab when they finish.
+  - The other tools (Split, Extract pages, conversions, Compare, Summarize, Translate) save new
+    files next to the document. A PDF result opens in a new tab.
+  - Each change is a new version: **Undo** (**Ctrl+Z**) and **Redo** (**Ctrl+Y**) step through
+    them, and the file on disk changes only when you save.
+- **Save** (**Ctrl+S**) and **Save as** (**Ctrl+Shift+S**). If the file can't be written (open in
+  another program, read-only folder), PageSmith offers *Save as*.
+- **Print** (**Ctrl+P**): all pages, the current page or a range, turned to match the paper and
+  shrunk to fit when needed.
+- **Document properties** (**Ctrl+D**): title, author, dates, producer, PDF version, pages, page
+  size, file size, security, forms and bookmarks.
+- The reader remembers which side panel and whether the tools pane were open.
+
+### 1.3 Things that work across the app
 
 - **Native Windows 11 look.**
   - WPF-UI Fluent controls, Mica backdrop, Fluent System Icons and the Windows accent colour.
@@ -95,7 +161,7 @@ that sends emails and stores documents, which goes against PageSmith running on 
 - **Passwords.** An encrypted PDF shows a lock on its card that you click to enter the password;
   editors and tools ask for it when they open or run. Restriction-only PDFs just work.
 - **Results.**
-  - Open the file, show it in its folder, copy text output.
+  - Open the file (a PDF opens in a tab), show it in its folder, copy text output.
   - *Continue with…* sends the result straight into another tool.
 - **Offline-first.**
   - The title bar shows *Online*/*Offline*, rechecked every 45 s and on network changes.
@@ -109,10 +175,10 @@ that sends emails and stores documents, which goes against PageSmith running on 
   - translation service;
   - Claude API key for translation, encrypted with Windows DPAPI.
 - **About** shows the iLovePDF Free vs Premium catalog next to what PageSmith includes.
-- **Command line.** `PageSmith.exe file.pdf` opens the right tool. Developer options are in §5.6.
+- **Command line.** `PageSmith.exe file.pdf …` opens the files in tabs. Developer options are in §5.6.
 - **Errors** are logged to `%APPDATA%\PageSmith\pagesmith.log` and shown in-app, never as crash dialogs.
 
-### 1.3 Fixed since 0.1.0
+### 1.4 Fixed since 0.1.0
 
 - **Window size (0.2.1).** The window always opened at 1360 × 880, which is taller than the
   usable screen on common laptops (for example 1920 × 1080 at 125% scaling leaves 1536 × 816),
@@ -122,6 +188,8 @@ that sends emails and stores documents, which goes against PageSmith running on 
   unplugging a monitor, is pulled back on screen.
 - **Option panels.** PDF to PowerPoint, PDF to Excel and Add watermark referenced a style that
   didn't exist, so their option panels failed to load.
+- **Font size boxes (0.3.0).** In Add page numbers and Add watermark the font size box was so
+  narrow that its spin buttons hid the number. The number now shows; type it or use the arrow keys.
 - **Visible digital signature.** It was drawn outside its own box, so it was invisible in every
   PDF viewer. It now shows and prints, and the signature still verifies.
 - **Dropdowns.** A filled dropdown now shows its value in Windows' built-in PDF viewer too.
@@ -129,8 +197,18 @@ that sends emails and stores documents, which goes against PageSmith running on 
 - **AI Summarizer** is now offline-only in the app. The Claude engine (`SummaryEngine.Claude`,
   `ClaudeService`) is still in `PageSmith.Core`, untouched, for a future online option.
 
-### 1.4 Known issues
+### 1.5 Known issues
 
+- **Reader.**
+  - Moving, inserting or deleting pages from the thumbnails (like Organize PDF and Remove pages)
+    builds a new file from the pages, so bookmarks and links between pages are not kept. Rotating
+    pages keeps everything.
+  - Windows' PDF engine draws sticky notes with its own orange icon. Other readers show the note's
+    own yellow icon.
+  - Printing sends each page as a 300 dpi image. It looks right, but large print jobs are big, and
+    PageSmith waits while the pages are prepared.
+  - Selecting across table columns highlights whole lines, the way most readers do.
+  - Form fields are filled with the *PDF Forms* tool, not by typing on the page in the viewer.
 - **Slow first thumbnail.** The first thumbnail after start-up can take a few seconds while the
   Windows PDF renderer warms up. Compare's *Visual overlay* takes a few seconds the first time
   for the same reason.
@@ -165,7 +243,12 @@ Work happens on `feature/*` branches cut from `develop` (see §6).
 - [ ] **Offline Retry:** with Wi-Fi off, check that HTML to PDF (web address), Translate and Sign
   (with a timestamp) show the offline bar, and that **Retry** works once back online.
 - [ ] **Mouse and pen:** in every page-editor tool, check drawing, moving and resizing with mouse,
-  touch and pen.
+  touch and pen. In the reader, check selecting text, the hand tool and dragging thumbnails.
+- [ ] **Printer:** print a document (all pages, a range, the current page) on a real printer, in
+  portrait and landscape.
+- [ ] **Opening from Explorer:** use *Settings → Opening PDFs*, choose PageSmith in Windows'
+  *Default apps*, then double-click PDFs in Explorer with PageSmith closed and while it runs (they
+  should open as tabs in the same window). Check *Remove* takes PageSmith out of *Open with*.
 
 ### 2.2 Quality and release
 
@@ -173,6 +256,12 @@ Work happens on `feature/*` branches cut from `develop` (see §6).
   and big files (500+ pages).
 - [ ] Summarizer polish: skip table-like lines; strip e-mail addresses and URLs before keyword
   scoring.
+- [ ] Reader polish:
+  - fill form fields by typing on the page;
+  - two-page and single-page views, *Rotate view*, full-screen reading mode;
+  - reopen last session's tabs and remember the last page of each document;
+  - keep bookmarks when pages are moved, inserted or deleted;
+  - print text as text (vector) instead of page images.
 - [ ] Fix the Release-build warnings.
 - [ ] Accessibility pass: keyboard navigation through every screen, automation names for
   icon-only buttons, high-contrast theme check.
@@ -265,7 +354,7 @@ git clone https://github.com/Randula-Gunathilake/PageSmith---pdfEditor-for-windo
 cd PageSmith
 ```
 
-- `main` holds released versions; the newest is tagged `v0.2.1`.
+- `main` holds released versions; the newest is tagged `v0.3.0`.
 - `develop` has the latest integrated work.
 
 To build the newest code:
@@ -294,14 +383,16 @@ dotnet run --project src/PageSmith.App
   You can start it directly.
 - In Visual Studio or Rider, open `PageSmith.slnx`, set **PageSmith.App** as the startup
   project, and press F5.
-- To open files at start-up, put them after `--`.
-  - A PDF opens Organize.
-  - Several PDFs open Merge.
-  - Images open JPG to PDF.
+- To open files at start-up, put them after `--`. Each opens in a tab; images, Office files and
+  web pages open as new PDFs.
 
   ```bash
   dotnet run --project src/PageSmith.App -- "C:\Docs\report.pdf"
   ```
+
+- **Only one PageSmith runs per user.** Starting it while it is already running hands the files to
+  the running window and exits. To try a new build, close the running PageSmith first (snapshot
+  runs, §5.6, are not affected).
 
 ### 5.4 Run the tests
 
@@ -309,9 +400,13 @@ dotnet run --project src/PageSmith.App
 dotnet test tests/PageSmith.Tests
 ```
 
-- **82 tests, about a minute.** They build real PDFs, render them, and check the output of every
+- **96 tests, under a minute.** They build real PDFs, render them, and check the output of every
   engine. Some render the output with Windows' PDF engine to check that things are actually
-  visible: the signature box, filled dropdowns, black & white scans.
+  visible: the signature box, filled dropdowns, black & white scans, highlights and notes.
+- **Reader tests** (`ReaderTests`) cover text search and selection, bookmarks, links, comments,
+  document properties, the single-window hand-off (over a private pipe name) and the *Open with*
+  registration (under `HKEY_CURRENT_USER\Software\PageSmithTests`, never your real file
+  associations).
 - **Optional parts.** The OCR test runs only if a Windows OCR language is installed. The
   Microsoft Office test runs only if Word is installed. Otherwise they return early and count
   as passed.
@@ -369,11 +464,15 @@ it; nothing needs installing.
   scripts/publish.ps1          release build script
   src/PageSmith.Core/          all PDF work, no UI: Tools/, Pdf/, Text/, Imaging/, Ocr/, Office/, Intelligence/, Workflows/, Net/
   src/PageSmith.App/           WPF app:
-    Controls/                  FileList, PageGrid, PageEditor (+ ElementVisual), CompareView, ScanWorkspace,
-                               HtmlWorkspace, SignaturePad, CameraWindow, ToolShell, ResultView
+    Controls/                  the reader: DocumentTabs, DocumentView (toolbar, panels, find, tool mode),
+                               PdfViewer (continuous page view);
+                               tools: FileList, PageGrid, PageEditor (+ ElementVisual), CompareView,
+                               ScanWorkspace, HtmlWorkspace, SignaturePad, CameraWindow, ToolShell, ResultView
+    Documents/                 DocumentSession (one open document: versions, undo, save), DocumentWorkspace
+                               (tabs, open, save, close), PageActions (thumbnail and comment changes)
     Tools/                     one controller per tool; Tools/Editor/ holds the page-editor tools;
                                OptionTemplates.xaml and EditorTemplates.xaml are their option panels
-    Infrastructure/            registry, settings, services, WebPageCapture (HTML), ScanSources (WIA)
+    Infrastructure/            registry, settings, services, PdfPrinter, WebPageCapture (HTML), ScanSources (WIA)
     Pages/                     Home, Workflows, Settings, About
   tests/PageSmith.Tests/       xUnit tests for the engines
   tools/IconGen/               renders Assets/PageSmith.ico and PNG icons
@@ -402,6 +501,19 @@ it; nothing needs installing.
   - Snapshot runs never write `settings.json`, so `--theme` and test files don't leak into your
     own settings.
   - `--page` also accepts `home`, `workflows`, `settings` and `about`.
+  - **Reader:** `--files` without `--page` opens the files in tabs. Then:
+    - `--goto 12` goes to a page, `--select-all` selects all text, and `--drag 200,280,560,370`
+      drags the mouse between two points of the page view (same steps as a real drag);
+    - `--find "text"` searches, `--highlight "text"` highlights the first match, and
+      `--note "text"` adds a note on page 1;
+    - `--panel pages|bookmarks|comments|none` picks the side panel, `--properties` opens the
+      properties dialog;
+    - `--doc-tool rotate` opens a tool on the document; add `--run` (and `--demo`) to run it,
+      which replaces the document like the real button does.
+
+  ```bash
+  PageSmith.exe --files "report.pdf" --find "revenue" --panel bookmarks --theme dark --snapshot reader.png
+  ```
 - **"File is locked by PageSmith" build errors** mean the app is still running. Close it, or run
   `Stop-Process -Name PageSmith`.
 - **Icons:** WPF-UI's `SymbolIcon` can only draw Fluent icons whose code point is in the Basic
@@ -420,6 +532,15 @@ it; nothing needs installing.
   - `%APPDATA%\PageSmith\` holds `settings.json`, `workflows.json` and `pagesmith.log`.
   - `%LOCALAPPDATA%\PageSmith\WebView2` is HTML to PDF's browser profile.
   - Scanned pages and photos wait in `%TEMP%\PageSmith\Scans` until they're turned into a PDF.
+  - Each open document works on private copies in `%TEMP%\PageSmith\Documents\<id>`: one folder
+    per version (for undo) plus tool results. The folder is deleted when its tab closes.
+  - *Settings → Opening PDFs* writes only under `HKEY_CURRENT_USER`: the `PageSmith.Document`
+    ProgID, `.pdf\OpenWithProgids`, `Applications\PageSmith.exe`, `Software\PageSmith\Capabilities`
+    and `RegisteredApplications`. *Remove* deletes them again.
+- **The reader's rendering** uses `Windows.Data.Pdf` through `PdfRenderer`, which serializes
+  renders. Disposing a renderer waits for a render in progress, so a viewer can swap renderers
+  when the document changes. Text for find and selection comes from `TextIndex` (PdfPig), read
+  page by page as needed.
 
 ---
 
@@ -429,7 +550,7 @@ it; nothing needs installing.
 |---|---|
 | `main` | Released versions only; every merge is tagged (`v0.1.0`, `v0.2.0`, `v1.0.0`, …) |
 | `develop` | Integration branch; always builds and passes tests |
-| `feature/<name>` | One feature each (`feature/ui-tools`, `feature/ml-deskew`, …), merged into `develop` with `--no-ff` |
+| `feature/<name>` | One feature each (`feature/ui-tools`, `feature/reader`, `feature/ml-deskew`, …), merged into `develop` with `--no-ff` |
 | `release/<version>` | Final checks and version bump, merged into `main` (tagged) and back into `develop` |
 
 Commit messages follow Conventional Commits: `feat(scope): …`, `fix(scope): …`, `docs: …`,

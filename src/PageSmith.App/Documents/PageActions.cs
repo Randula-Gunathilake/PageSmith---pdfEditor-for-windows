@@ -2,6 +2,7 @@ using System.IO;
 using PageSmith.App.Infrastructure;
 using PageSmith.Core.Common;
 using PageSmith.Core.Imaging;
+using PageSmith.Core.Pdf;
 using PageSmith.Core.Tools.Convert;
 using PageSmith.Core.Tools.Edit;
 using PageSmith.Core.Tools.Organize;
@@ -143,6 +144,22 @@ public static class PageActions
         {
             var output = Path.Combine(folder, Path.GetFileName(session.CurrentPath));
             await MarkupTool.RunAsync(new MarkupOptions { Input = session.CurrentInput, OutputPath = output, Kind = kind, Marks = marks });
+            return output;
+        });
+
+    public static Task AddNoteAsync(DocumentSession session, int page, System.Windows.Point at, string text) =>
+        ApplyAsync(session, "Add note", async folder =>
+        {
+            var output = Path.Combine(folder, Path.GetFileName(session.CurrentPath));
+            await DocumentComments.AddNoteAsync(session.CurrentInput, output, page, at, text);
+            return output;
+        });
+
+    public static Task DeleteCommentAsync(DocumentSession session, PageComment comment) =>
+        ApplyAsync(session, $"Delete {DocumentComments.Describe(comment.Kind).ToLowerInvariant()}", async folder =>
+        {
+            var output = Path.Combine(folder, Path.GetFileName(session.CurrentPath));
+            await DocumentComments.DeleteAsync(session.CurrentInput, output, comment);
             return output;
         });
 

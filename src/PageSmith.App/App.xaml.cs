@@ -116,6 +116,8 @@ public partial class App : Application
                 await reader.Session.GetTextAsync();
                 reader.PageView.SimulateDrag(new Point(drag[0], drag[1]), new Point(drag[2], drag[3]));
             }
+            if (args.Highlight != null) await reader.DemoHighlightAsync(args.Highlight);
+            if (args.Note != null) await reader.DemoNoteAsync(0, new Point(260, 140), args.Note);
             if (args.Properties) _ = reader.ShowPropertiesAsync();
             if (args.Find != null)
             {
@@ -201,6 +203,12 @@ public sealed class CommandLine
 
     public bool Properties { get; private set; }
 
+    /// <summary>Highlights the first match of this text in the reader.</summary>
+    public string? Highlight { get; private set; }
+
+    /// <summary>Adds a note with this text near the top of the first page.</summary>
+    public string? Note { get; private set; }
+
     public static CommandLine Parse(string[] args)
     {
         var c = new CommandLine();
@@ -226,6 +234,8 @@ public sealed class CommandLine
                 case "--panel": c.Panel = Next(); break;
                 case "--drag": c.Drag = Next().Split(',').Select(v => double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0).ToArray(); break;
                 case "--properties": c.Properties = true; break;
+                case "--highlight": c.Highlight = Next(); break;
+                case "--note": c.Note = Next(); break;
                 default:
                     if (File.Exists(args[i])) c.Files.Add(Path.GetFullPath(args[i]));
                     break;

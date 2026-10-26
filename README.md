@@ -1,9 +1,18 @@
 # PageSmith
 
-PageSmith is a native Windows 11 PDF toolbox that covers every tool of the iLovePDF web
-app (Free and Premium tiers) and runs on your PC without an internet connection.
+PageSmith is a native Windows 11 PDF reader and toolbox. It covers every tool of the iLovePDF
+web app (Free and Premium tiers) and runs on your PC without an internet connection.
 Features that need the internet (web page capture, translation) check the connection first
 and offer *Retry* when you are offline.
+
+- **Read like in Adobe Acrobat:** PDFs open in tabs, with thumbnails, bookmarks, links, find,
+  text selection, highlights and notes, print and document properties. Images, Office files and
+  web pages open as new PDFs.
+- **Every tool works on the open document:** merge, compress, OCR, rotate, edit, sign, protect,
+  redact and the rest replace the document in its tab, with undo, until you save. Conversions,
+  split and compare save new files next to it.
+- **Opening PDFs from Explorer:** *Settings → Opening PDFs* adds PageSmith to *Open with*, and
+  PDFs opened while it runs join the same window as tabs.
 
 - [TODO.md](TODO.md): what works today, what's next (v1.0 and the machine-learning v2.0), and
   a detailed build guide.

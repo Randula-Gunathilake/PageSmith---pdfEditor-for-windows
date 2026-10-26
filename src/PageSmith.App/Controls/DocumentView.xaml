@@ -281,6 +281,13 @@
                             ToolTip="Hand: drag to move the pages (or hold Space)">
                             <ui:SymbolIcon FontSize="18" Symbol="HandRight24" />
                         </ToggleButton>
+                        <ToggleButton
+                            x:Name="NoteToggle"
+                            Click="OnNoteTool"
+                            Style="{StaticResource BarToggle}"
+                            ToolTip="Add a note: click where it goes">
+                            <ui:SymbolIcon FontSize="18" Symbol="NoteAdd24" />
+                        </ToggleButton>
                         <Border Style="{StaticResource BarSeparator}" />
                         <ToggleButton
                             x:Name="FindToggle"
@@ -428,6 +435,14 @@
                             Tag="bookmarks"
                             ToolTip="Bookmarks">
                             <ui:SymbolIcon FontSize="20" Symbol="BookmarkMultiple24" />
+                        </ToggleButton>
+                        <ToggleButton
+                            x:Name="CommentsToggle"
+                            Click="OnRailClick"
+                            Style="{StaticResource RailButton}"
+                            Tag="comments"
+                            ToolTip="Comments">
+                            <ui:SymbolIcon FontSize="20" Symbol="CommentMultiple24" />
                         </ToggleButton>
                     </StackPanel>
                 </Border>
@@ -606,6 +621,104 @@
                             Text="This document has no bookmarks."
                             TextWrapping="Wrap"
                             Visibility="Collapsed" />
+
+                        <ListBox
+                            x:Name="CommentList"
+                            Grid.Row="1"
+                            Padding="0,0,0,12"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            KeyDown="OnCommentListKey"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                            SelectionChanged="OnCommentSelected"
+                            Visibility="Collapsed">
+                            <ListBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem
+                                        Click="OnDeleteComment"
+                                        Header="Delete comment"
+                                        InputGestureText="Del">
+                                        <MenuItem.Icon>
+                                            <ui:SymbolIcon Symbol="Delete24" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Margin" Value="8,1" />
+                                    <Setter Property="Cursor" Value="Hand" />
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border
+                                                    x:Name="Box"
+                                                    Padding="8,7"
+                                                    Background="Transparent"
+                                                    CornerRadius="6">
+                                                    <ContentPresenter />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type controls:CommentRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:SymbolIcon
+                                            Margin="0,1,10,0"
+                                            VerticalAlignment="Top"
+                                            FontSize="18"
+                                            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                            Symbol="{Binding Icon}" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock
+                                                FontSize="12.5"
+                                                FontWeight="SemiBold"
+                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                Text="{Binding Title}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                FontSize="11.5"
+                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                Text="{Binding Details}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                MaxHeight="54"
+                                                Margin="0,3,0,0"
+                                                FontSize="12.5"
+                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                Text="{Binding Text}"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="Wrap"
+                                                Visibility="{Binding Text, Converter={StaticResource NullToVisibility}}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock
+                            x:Name="NoComments"
+                            Grid.Row="1"
+                            Margin="16,4,16,0"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            Text="No comments yet. Select text to highlight it, or use the note tool to add a note."
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
                     </Grid>
                 </Border>
 
@@ -657,6 +770,14 @@
                                 Header="Redact">
                                 <MenuItem.Icon>
                                     <ui:SymbolIcon Symbol="EyeOff24" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem
+                                x:Name="AddNoteItem"
+                                Click="OnAddNoteHere"
+                                Header="Add a note here">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="NoteAdd24" />
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />

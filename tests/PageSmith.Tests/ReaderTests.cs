@@ -134,6 +134,64 @@ public class ReaderTests
     }
 
     [Fact]
+    public async Task Notes_are_added_listed_and_deleted_alongside_other_comments()
+    {
+        using var files = new TestFiles();
+        var src = files.CreatePdf("doc.pdf", 2, body: _ => "Some text to highlight");
+        // A link is an annotation too, but not a comment.
+        using (var doc = PdfSharp.Pdf.IO.PdfReader.Open(src, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify))
+        {
+            doc.Pages[0].AddWebLink(new PdfSharp.Pdf.PdfRectangle(new PdfSharp.Drawing.XRect(72, 700, 100, 20)), "https://example.com");
+            doc.Save(src);
+        }
+        var noted = files.PathFor("noted.pdf");
+        await DocumentComments.AddNoteAsync(src, noted, 1, new Point(100, 200), "Check these numbers", "Reviewer");
+        IReadOnlyList<TextHit> hits;
+        using (var index = TextIndex.Open(new InputFile(noted))) hits = index.Find("highlight");
+        var marked = files.PathFor("marked.pdf");
+        await MarkupTool.RunAsync(new MarkupOptions { Input = noted, OutputPath = marked, Kind = MarkupKind.Highlight, Marks = [new MarkupMark(0, hits[0].Boxes, "highlight")] });
+
+        var comments = DocumentComments.Read(marked);
+        Assert.Equal(2, comments.Count);
+        var note = Assert.Single(comments, c => c.Kind == CommentKind.Note);
+        Assert.Equal(1, note.PageIndex);
+        Assert.Equal("Check these numbers", note.Text);
+        Assert.Equal("Reviewer", note.Author);
+        Assert.Equal(100, note.Bounds.Left, 1);
+        Assert.Equal(200, note.Bounds.Top, 1);
+        Assert.NotNull(note.Modified);
+        var highlight = Assert.Single(comments, c => c.Kind == CommentKind.Highlight);
+        Assert.Equal(0, highlight.PageIndex);
+        Assert.Equal("highlight", highlight.Text);
+
+        // The note shows as an icon: Windows draws its own orange one, other readers the note's yellow bubble.
+        using (var renderer = await PageSmith.Core.Rendering.PdfRenderer.OpenAsync(marked))
+        {
+            var px = PageSmith.Core.Imaging.ImageIO.ToPixels(await renderer.RenderAsync(1, 144));
+            var coloured = 0;
+            for (var y = 400; y < 440; y++)
+            for (var x = 200; x < 240; x++)
+            {
+                var i = (y * px.Width + x) * 4;
+                if (px.Pixels[i + 2] > 180 && px.Pixels[i] < 110) coloured++;
+            }
+            Assert.True(coloured > 100, $"the note icon is drawn ({coloured} coloured pixels)");
+        }
+
+        var cleaned = files.PathFor("cleaned.pdf");
+        await DocumentComments.DeleteAsync(marked, cleaned, highlight);
+        Assert.Equal(CommentKind.Note, Assert.Single(DocumentComments.Read(cleaned)).Kind);
+        Assert.Single(DocumentLinks.Read(cleaned));
+    }
+
+    [Theory]
+    [InlineData("D:20261027143005+05'30'", 2026, 10, 27, 14, 30, 5)]
+    [InlineData("D:20261027", 2026, 10, 27, 0, 0, 0)]
+    [InlineData("20200101120000Z", 2020, 1, 1, 12, 0, 0)]
+    public void Pdf_dates_are_read(string text, int y, int mo, int d, int h, int mi, int s) =>
+        Assert.Equal(new DateTime(y, mo, d, h, mi, s), DocumentComments.ParseDate(text));
+
+    [Fact]
     public void Pdf_app_registration_adds_and_removes_open_with_entries()
     {
         // A scratch key: the real HKCU\Software\Classes is never touched by tests.

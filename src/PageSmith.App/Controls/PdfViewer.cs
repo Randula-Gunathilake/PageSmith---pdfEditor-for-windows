@@ -27,7 +27,13 @@ public enum ViewerTool
 
     /// <summary>Drag to move the pages around.</summary>
     Hand,
+
+    /// <summary>Click to place a sticky note.</summary>
+    Note,
 }
+
+/// <summary>A point on a page, in display-space points.</summary>
+public readonly record struct PagePoint(int Page, Point Point);
 
 /// <summary>
 /// A document's pages in one continuous scrolling view, like a PDF reader. Only the pages in or near
@@ -54,6 +60,9 @@ public sealed class PdfViewer : UserControl
     private readonly Dictionary<int, CachedPage> _cache = [];
     private readonly DispatcherTimer _renderTimer = new() { Interval = TimeSpan.FromMilliseconds(60) };
     private readonly DispatcherTimer _autoScroll = new() { Interval = TimeSpan.FromMilliseconds(40) };
+    private readonly DispatcherTimer _spotTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
+    private (int Page, Rect Box)? _spot;
+    private ILookup<int, PageComment> _comments = Array.Empty<PageComment>().ToLookup(c => c.PageIndex);
     private DocumentSession? _session;
     private double[] _tops = [];
     private double _contentWidth;
@@ -120,6 +129,15 @@ public sealed class PdfViewer : UserControl
         _scroll.PreviewKeyDown += OnKey;
         _canvas.MouseLeftButtonDown += OnLeftDown;
         _canvas.MouseDown += OnOtherDown;
+        _canvas.PreviewMouseRightButtonDown += (_, e) =>
+            ContextPoint = HitPage(e.GetPosition(_canvas), nearest: false) is { } hit ? new PagePoint(hit.Page, hit.Point) : null;
+        _spotTimer.Tick += (_, _) =>
+        {
+            _spotTimer.Stop();
+            var page = _spot?.Page;
+            _spot = null;
+            if (page is { } p && _views.TryGetValue(p, out var view)) DrawOverlay(view);
+        };
         _canvas.MouseMove += OnMove;
         _canvas.MouseUp += OnUp;
         _canvas.LostMouseCapture += (_, _) => EndDrag();
@@ -131,6 +149,12 @@ public sealed class PdfViewer : UserControl
 
     /// <summary>A link was clicked; the reader goes to its page or offers to open its address.</summary>
     public event EventHandler<PageLink>? LinkClicked;
+
+    /// <summary>With the note tool, a page was clicked where a note should go.</summary>
+    public event EventHandler<PagePoint>? NotePlaced;
+
+    /// <summary>Where the context menu was opened on a page, if it was.</summary>
+    public PagePoint? ContextPoint { get; private set; }
 
     /// <summary>1 is actual size (100 %).</summary>
     public double Zoom => _zoom;
@@ -147,7 +171,7 @@ public sealed class PdfViewer : UserControl
         set
         {
             _tool = value;
-            _canvas.Cursor = value == ViewerTool.Hand ? Cursors.Hand : null;
+            _canvas.Cursor = ToolCursor;
         }
     }
 
@@ -163,6 +187,13 @@ public sealed class PdfViewer : UserControl
             Reset(keepPosition: false);
         }
     }
+
+    private Cursor? ToolCursor => _tool switch
+    {
+        ViewerTool.Hand => Cursors.Hand,
+        ViewerTool.Note => Cursors.Cross,
+        _ => null,
+    };
 
     private double Scale => _zoom * PointToDip;
 
@@ -200,6 +231,8 @@ public sealed class PdfViewer : UserControl
         _hitsByPage = Array.Empty<int>().ToLookup(i => i);
         _currentHit = -1;
         _links = Array.Empty<PageLink>().ToLookup(l => l.PageIndex);
+        _comments = Array.Empty<PageComment>().ToLookup(c => c.PageIndex);
+        _spot = null;
         var hadSelection = _anchor != null;
         _anchor = _focus = null;
         if (Mode != ZoomMode.Custom && ActualWidth > 0) _zoom = FitZoom();
@@ -603,6 +636,29 @@ public sealed class PdfViewer : UserControl
                 view.Overlay.Children.Add(Box(box, i == _currentHit ? CurrentHitBrush : HitBrush));
         foreach (var box in SelectionBoxes(view.Index))
             view.Overlay.Children.Add(Box(box, SelectionBrush));
+        if (_spot is { } spot && spot.Page == view.Index)
+        {
+            var frame = Box(spot.Box, Brushes.Transparent);
+            frame.SetResourceReference(Shape.StrokeProperty, "AccentFillColorDefaultBrush");
+            frame.StrokeThickness = 2;
+            frame.RadiusX = frame.RadiusY = 3;
+            view.Overlay.Children.Add(frame);
+        }
+    }
+
+    /// <summary>Brings an area of a page into view and outlines it for a moment (a comment picked in the list, say).</summary>
+    public void ShowSpot(int page, Rect box)
+    {
+        if (page < 0 || page >= _tops.Length) return;
+        var old = _spot?.Page;
+        box.Inflate(3, 3);
+        _spot = (page, box);
+        Reveal(page, box);
+        UpdateVisible();
+        foreach (var p in new[] { old, page }.OfType<int>().Distinct())
+            if (_views.TryGetValue(p, out var view)) DrawOverlay(view);
+        _spotTimer.Stop();
+        _spotTimer.Start();
     }
 
     private static Rectangle Box(Rect r, Brush fill)
@@ -636,6 +692,12 @@ public sealed class PdfViewer : UserControl
         if (Tool == ViewerTool.Hand || Keyboard.IsKeyDown(Key.Space))
         {
             StartPan(e);
+            return;
+        }
+        if (Tool == ViewerTool.Note)
+        {
+            if (HitPage(e.GetPosition(_canvas), nearest: false) is { } spot) NotePlaced?.Invoke(this, new PagePoint(spot.Page, spot.Point));
+            e.Handled = true;
             return;
         }
         Press(e.GetPosition(_canvas), e.ClickCount);
@@ -786,10 +848,33 @@ public sealed class PdfViewer : UserControl
             if (!Equals(_canvas.ToolTip, tip)) _canvas.ToolTip = tip;
             return;
         }
+        if (CommentAt(canvasPoint) is { } comment)
+        {
+            _canvas.Cursor = null;
+            var heading = DocumentComments.Describe(comment.Kind) + (comment.Author != null ? $" · {comment.Author}" : "");
+            var tip = $"{heading}\n{comment.Text}";
+            if (!Equals(_canvas.ToolTip, tip)) _canvas.ToolTip = tip;
+            return;
+        }
         _canvas.ToolTip = null;
         var overText = Text is { } text && HitPage(canvasPoint, nearest: false) is { } hit &&
                        text.Loaded(hit.Page)?.WordAt(hit.Point, nearest: false) >= 0;
         _canvas.Cursor = overText ? Cursors.IBeam : null;
+    }
+
+    /// <summary>The document's comments, so hovering one shows what it says.</summary>
+    public void SetComments(IReadOnlyList<PageComment> comments) =>
+        _comments = comments.Where(c => c.Text != null).ToLookup(c => c.PageIndex);
+
+    private PageComment? CommentAt(Point canvasPoint)
+    {
+        if (HitPage(canvasPoint, nearest: false) is not { } hit) return null;
+        return _comments[hit.Page].LastOrDefault(c =>
+        {
+            var area = c.Bounds;
+            area.Inflate(2, 2);
+            return area.Contains(hit.Point);
+        });
     }
 
     private void OnUp(object sender, MouseButtonEventArgs e)
@@ -813,7 +898,7 @@ public sealed class PdfViewer : UserControl
         if (_drag == Drag.None) return;
         _drag = Drag.None;
         _autoScroll.Stop();
-        _canvas.Cursor = Tool == ViewerTool.Hand ? Cursors.Hand : null;
+        _canvas.Cursor = ToolCursor;
         if (_canvas.IsMouseCaptured) _canvas.ReleaseMouseCapture();
     }
 

@@ -139,3 +139,20 @@ batch limits other than the machine's memory. Everything runs locally unless the
 | Translate | Layout-preserving translation through MyMemory, LibreTranslate or Claude | **Online** |
 | Workflows | Reusable chains of tools with saved options, run on many files | Offline |
 | Continue with another tool | Every result can be passed into the next tool | – |
+
+## 5. Beyond iLovePDF: the reader
+
+iLovePDF is a set of one-shot web tools: you upload, pick a tool, download. As a desktop app,
+PageSmith also works like a PDF reader such as Adobe Acrobat (since 0.3.0):
+
+| Feature | PageSmith implementation |
+|---|---|
+| Documents in tabs | Home tab plus one tab per document; unsaved-change dots; Ctrl+Tab, Ctrl+W; one window per user, so PDFs opened from Explorer join it |
+| Viewer | Continuous pages rendered on demand with Windows.Data.Pdf; zoom around the pointer, fit width/page; thumbnails, bookmarks, working links |
+| Find and select | PdfPig text in reading order (column-aware), searched in the background; selection across pages, copy |
+| Comments | Highlight, underline, strikethrough and sticky notes saved as standard PDF annotations; a Comments panel to review and delete them |
+| Tools on the open document | Every PDF tool runs on the document in its tab; tools that change it create an undoable new version, saved only on Save |
+| Page actions | Rotate, delete, extract, insert (files or blank pages) and drag-to-reorder from the thumbnails |
+| Other formats | Images, Word/Excel/PowerPoint and HTML open as new PDFs |
+| Print, properties | Windows print dialog (all, current page, range; auto-rotate, shrink to fit); document information |
+| Default PDF app | Per-user registration in *Open with* and *Default apps*; no admin rights needed |

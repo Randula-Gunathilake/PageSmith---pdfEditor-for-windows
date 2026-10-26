@@ -35,11 +35,13 @@ public partial class DocumentView : UserControl
 
     private readonly DocumentSession _session;
     private readonly List<PageThumbnail> _thumbQueue = [];
+    private readonly Queue<PageThumbnail> _loadedThumbs = new();
     private readonly DispatcherTimer _findTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
     private ObservableCollection<PageThumbnail> _thumbs = [];
     private int _version;
     private bool _thumbPumping, _syncingThumbs, _updatingZoom, _hasOutline;
     private string _panel = "";
+    private IReadOnlyList<PageComment> _comments = [];
     private ToolController? _tool;
     private CancellationTokenSource? _findCts;
     private IReadOnlyList<TextHit> _hits = [];
@@ -57,6 +59,7 @@ public partial class DocumentView : UserControl
         Viewer.CurrentPageChanged += (_, _) => OnPageChanged();
         Viewer.ZoomChanged += (_, _) => ShowZoom();
         Viewer.LinkClicked += OnLinkClicked;
+        Viewer.NotePlaced += OnNotePlaced;
         session.VersionChanged += OnVersionChanged;
         _findTimer.Tick += (_, _) => RunFind();
         ShowToolList(null);
@@ -248,6 +251,7 @@ public partial class DocumentView : UserControl
         Viewer.Tool = tool;
         SelectToggle.IsChecked = tool == ViewerTool.Select;
         HandToggle.IsChecked = tool == ViewerTool.Hand;
+        NoteToggle.IsChecked = tool == ViewerTool.Note;
     }
 
     private async void OnProperties(object sender, RoutedEventArgs e) => await ShowPropertiesAsync();
@@ -271,9 +275,10 @@ public partial class DocumentView : UserControl
 
     private void ShowPanel(string? panel)
     {
-        _panel = panel is "pages" or "bookmarks" ? panel : "";
+        _panel = panel is "pages" or "bookmarks" or "comments" ? panel : "";
         PagesToggle.IsChecked = _panel == "pages";
         BookmarksToggle.IsChecked = _panel == "bookmarks";
+        CommentsToggle.IsChecked = _panel == "comments";
         SidePanel.Visibility = _panel.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdatePanelParts();
         if (_panel == "pages") Dispatcher.InvokeAsync(SyncThumbSelection, DispatcherPriority.Loaded);
@@ -281,15 +286,20 @@ public partial class DocumentView : UserControl
 
     private void UpdatePanelParts()
     {
-        SideTitle.Text = _panel == "bookmarks" ? "Bookmarks" : "Pages";
-        Thumbs.Visibility = _panel == "pages" ? Visibility.Visible : Visibility.Collapsed;
-        Outline.Visibility = _panel == "bookmarks" && _hasOutline ? Visibility.Visible : Visibility.Collapsed;
-        NoBookmarks.Visibility = _panel == "bookmarks" && !_hasOutline ? Visibility.Visible : Visibility.Collapsed;
+        SideTitle.Text = _panel switch { "bookmarks" => "Bookmarks", "comments" => "Comments", _ => "Pages" };
+        Thumbs.Visibility = Show(_panel == "pages");
+        Outline.Visibility = Show(_panel == "bookmarks" && _hasOutline);
+        NoBookmarks.Visibility = Show(_panel == "bookmarks" && !_hasOutline);
+        CommentList.Visibility = Show(_panel == "comments" && _comments.Count > 0);
+        NoComments.Visibility = Show(_panel == "comments" && _comments.Count == 0);
+
+        static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void BuildThumbnails()
     {
         _thumbQueue.Clear();
+        _loadedThumbs.Clear();
         var sizes = _session.PageSizes;
         var list = new ObservableCollection<PageThumbnail>();
         for (var i = 0; i < sizes.Count; i++)
@@ -342,7 +352,11 @@ public partial class DocumentView : UserControl
                 {
                     var png = await renderer.RenderThumbnailPngAsync(t.Index, 264);
                     var image = await Task.Run(() => ImageIO.Decode(png));
-                    if (version == _version) t.Image = image;
+                    if (version == _version)
+                    {
+                        t.Image = image;
+                        ForgetOldThumbnails(t);
+                    }
                 }
                 catch (ObjectDisposedException)
                 {
@@ -357,6 +371,27 @@ public partial class DocumentView : UserControl
         finally
         {
             _thumbPumping = false;
+        }
+    }
+
+    /// <summary>
+    /// Keeps the images of the most recently shown thumbnails only, so a long document doesn't hold one
+    /// per page; a dropped image is rendered again when its thumbnail scrolls back into view.
+    /// </summary>
+    private void ForgetOldThumbnails(PageThumbnail loaded)
+    {
+        const int Keep = 150;
+        _loadedThumbs.Enqueue(loaded);
+        for (var checks = _loadedThumbs.Count; _loadedThumbs.Count > Keep && checks > 0; checks--)
+        {
+            var oldest = _loadedThumbs.Dequeue();
+            if (Thumbs.ItemContainerGenerator.ContainerFromItem(oldest) != null)
+            {
+                _loadedThumbs.Enqueue(oldest);
+                continue;
+            }
+            oldest.Image = null;
+            oldest.Requested = false;
         }
     }
 
@@ -545,18 +580,19 @@ public partial class DocumentView : UserControl
         }
     }
 
-    /// <summary>Reads the bookmarks and links of the current version in the background.</summary>
+    /// <summary>Reads the bookmarks, links and comments of the current version in the background.</summary>
     private async Task LoadOutlineAsync(int version)
     {
         IReadOnlyList<OutlineItem> outline = [];
         IReadOnlyList<PageLink> links = [];
+        IReadOnlyList<PageComment> comments = [];
         try
         {
             var input = _session.CurrentInput;
-            (outline, links) = await Task.Run(() =>
+            (outline, links, comments) = await Task.Run(() =>
             {
                 using var doc = Core.Common.PdfDocs.Open(input, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
-                return (DocumentOutline.Read(doc), DocumentLinks.Read(doc));
+                return (DocumentOutline.Read(doc), DocumentLinks.Read(doc), DocumentComments.Read(doc));
             });
         }
         catch (Exception ex)
@@ -566,8 +602,77 @@ public partial class DocumentView : UserControl
         if (version != _version) return;
         Outline.ItemsSource = outline;
         _hasOutline = outline.Count > 0;
+        _comments = comments;
+        CommentList.ItemsSource = comments.Select(c => new CommentRow(c)).ToList();
         UpdatePanelParts();
         Viewer.SetLinks(links);
+        Viewer.SetComments(comments);
+    }
+
+    /// <summary>Development aid for --snapshot: highlights the first match of a search, as the context menu does.</summary>
+    internal async Task DemoHighlightAsync(string query)
+    {
+        if (await _session.GetTextAsync() is not { } text || text.Find(query) is not { Count: > 0 } hits) return;
+        await PageActions.MarkupAsync(_session, MarkupKind.Highlight, [new MarkupMark(hits[0].PageIndex, hits[0].Boxes, hits[0].Text)]);
+    }
+
+    /// <summary>Development aid for --snapshot: adds a note, as the note tool does after its dialog.</summary>
+    internal Task DemoNoteAsync(int page, Point at, string text) => PageActions.AddNoteAsync(_session, page, at, text);
+
+    private void OnCommentSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (CommentList.SelectedItem is CommentRow row) Viewer.ShowSpot(row.Comment.PageIndex, row.Comment.Bounds);
+    }
+
+    private async void OnDeleteComment(object sender, RoutedEventArgs e) => await DeleteSelectedCommentAsync();
+
+    private async void OnCommentListKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Delete) return;
+        e.Handled = true;
+        await DeleteSelectedCommentAsync();
+    }
+
+    private async Task DeleteSelectedCommentAsync()
+    {
+        if (CommentList.SelectedItem is CommentRow row) await PageActions.DeleteCommentAsync(_session, row.Comment);
+    }
+
+    private void OnNoteTool(object sender, RoutedEventArgs e) => SetTool(Viewer.Tool == ViewerTool.Note ? ViewerTool.Select : ViewerTool.Note);
+
+    private async void OnNotePlaced(object? sender, PagePoint at)
+    {
+        SetTool(ViewerTool.Select);
+        await AddNoteAsync(at);
+    }
+
+    private async void OnAddNoteHere(object sender, RoutedEventArgs e)
+    {
+        if (Viewer.ContextPoint is { } at) await AddNoteAsync(at);
+    }
+
+    private async Task AddNoteAsync(PagePoint at)
+    {
+        var box = new Ui.TextBox
+        {
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinWidth = 380,
+            Height = 120,
+            VerticalContentAlignment = VerticalAlignment.Top,
+            PlaceholderText = "Type your note",
+        };
+        var dialog = new Ui.ContentDialog
+        {
+            Title = $"Add a note on page {at.Page + 1}",
+            Content = box,
+            PrimaryButtonText = "Add note",
+            CloseButtonText = "Cancel",
+            DefaultButton = Ui.ContentDialogButton.Primary,
+        };
+        dialog.Loaded += (_, _) => box.Focus();
+        if (await AppServices.ShowDialogAsync(dialog) != Ui.ContentDialogResult.Primary || string.IsNullOrWhiteSpace(box.Text)) return;
+        await PageActions.AddNoteAsync(_session, at.Page, at.Point, box.Text);
     }
 
     private async void OnLinkClicked(object? sender, PageLink link)
@@ -604,6 +709,7 @@ public partial class DocumentView : UserControl
     {
         var selected = Viewer.HasSelection;
         foreach (var item in new[] { CopyItem, HighlightItem, UnderlineItem, StrikeItem, RedactSelectionItem }) item.IsEnabled = selected;
+        AddNoteItem.IsEnabled = Viewer.ContextPoint != null;
     }
 
     private async void OnCopy(object sender, RoutedEventArgs e) => await Viewer.CopySelectionAsync();
@@ -1024,3 +1130,25 @@ public sealed partial class PageThumbnail(int index, double width, double height
 
 /// <summary>A category of tools in the All tools pane.</summary>
 public sealed record ToolGroup(string Title, IReadOnlyList<ToolDescriptor> Tools);
+
+/// <summary>A comment in the Comments panel.</summary>
+public sealed record CommentRow(PageComment Comment)
+{
+    public Ui.SymbolRegular Icon => Comment.Kind switch
+    {
+        CommentKind.Note => Ui.SymbolRegular.Note24,
+        CommentKind.Highlight => Ui.SymbolRegular.Highlight24,
+        CommentKind.Underline or CommentKind.Squiggly => Ui.SymbolRegular.TextUnderline24,
+        CommentKind.StrikeOut => Ui.SymbolRegular.TextStrikethrough24,
+        CommentKind.TextBox => Ui.SymbolRegular.Textbox24,
+        CommentKind.Drawing => Ui.SymbolRegular.HandDraw24,
+        CommentKind.Shape => Ui.SymbolRegular.Shapes24,
+        _ => Ui.SymbolRegular.Comment24,
+    };
+
+    public string Title => $"{DocumentComments.Describe(Comment.Kind)} · page {Comment.PageIndex + 1}";
+
+    public string Details => string.Join(" · ", new[] { Comment.Author, Comment.Modified?.ToString("d MMM yyyy, HH:mm", CultureInfo.CurrentCulture) }.Where(s => !string.IsNullOrEmpty(s)));
+
+    public string? Text => Comment.Text;
+}
