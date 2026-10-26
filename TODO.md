@@ -10,7 +10,7 @@ Free and Premium tiers, as an offline desktop app. This file tracks:
 For the iLovePDF research behind the feature list (plans, every tool's options, the Free vs
 Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 
-**Current version:** 0.2.0 (preview), last updated 2026-10-26.
+**Current version:** 0.2.1 (preview), last updated 2026-10-26.
 
 ---
 
@@ -114,6 +114,12 @@ that sends emails and stores documents, which goes against PageSmith running on 
 
 ### 1.3 Fixed since 0.1.0
 
+- **Window size (0.2.1).** The window always opened at 1360 × 880, which is taller than the
+  usable screen on common laptops (for example 1920 × 1080 at 125% scaling leaves 1536 × 816),
+  so its bottom was cut off. It now opens at 85% × 90% of the screen's usable area, centred and
+  at most 1440 × 940, or maximized on small screens (under 1280 × 800). After that it reopens
+  where you left it, maximized or not. A position that no longer fits, for example after
+  unplugging a monitor, is pulled back on screen.
 - **Option panels.** PDF to PowerPoint, PDF to Excel and Add watermark referenced a style that
   didn't exist, so their option panels failed to load.
 - **Visible digital signature.** It was drawn outside its own box, so it was invisible in every
@@ -259,7 +265,7 @@ git clone https://github.com/Randula-Gunathilake/PageSmith---pdfEditor-for-windo
 cd PageSmith
 ```
 
-- `main` holds released versions; the newest is tagged `v0.2.0`.
+- `main` holds released versions; the newest is tagged `v0.2.1`.
 - `develop` has the latest integrated work.
 
 To build the newest code:
@@ -393,6 +399,8 @@ it; nothing needs installing.
   - `--demo-alt` shows the tool's dialog or other view instead (the signature pad, Compare's
     overlay).
   - Snapshot windows don't take keyboard focus, so they can run while you use the PC.
+  - Snapshot runs never write `settings.json`, so `--theme` and test files don't leak into your
+    own settings.
   - `--page` also accepts `home`, `workflows`, `settings` and `about`.
 - **"File is locked by PageSmith" build errors** mean the app is still running. Close it, or run
   `Stop-Process -Name PageSmith`.
@@ -406,6 +414,8 @@ it; nothing needs installing.
 - **Text files are UTF-8 without BOM.** When scripting edits in Windows PowerShell 5.1, pass
   `-Encoding UTF8` or use `[IO.File]::ReadAllText(path, UTF8Encoding)`. Otherwise characters
   like "…" and "·" get mangled.
+- **Window size and position** come from `Infrastructure/WindowSizing.cs`. The last position is
+  saved as `Window` in `settings.json`; delete that entry to get the default size again.
 - **App data:**
   - `%APPDATA%\PageSmith\` holds `settings.json`, `workflows.json` and `pagesmith.log`.
   - `%LOCALAPPDATA%\PageSmith\WebView2` is HTML to PDF's browser profile.
