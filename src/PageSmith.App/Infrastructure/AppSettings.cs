@@ -31,6 +31,17 @@ public enum TranslationProvider
     MyMemory,
     LibreTranslate,
     Claude,
+    Gemini,
+    OpenAI,
+}
+
+/// <summary>Who writes a summary: this PC (offline), or an online AI service.</summary>
+public enum SummaryService
+{
+    OnThisPc,
+    Claude,
+    Gemini,
+    OpenAI,
 }
 
 /// <summary>User preferences, saved as JSON in %APPDATA%\PageSmith. Secrets are DPAPI-encrypted.</summary>
@@ -51,6 +62,15 @@ public sealed class AppSettings
     public string ProtectedLibreTranslateKey { get; set; } = "";
     public string ProtectedAnthropicKey { get; set; } = "";
     public string ClaudeModel { get; set; } = ClaudeService.DefaultModel;
+    public string ProtectedGeminiKey { get; set; } = "";
+    public string GeminiModel { get; set; } = GeminiService.DefaultModel;
+    public string ProtectedOpenAiKey { get; set; } = "";
+    public string OpenAiModel { get; set; } = OpenAiService.DefaultModel;
+
+    /// <summary>Who wrote the last summary; offered again next time.</summary>
+    public SummaryService Summarizer { get; set; } = SummaryService.OnThisPc;
+
+    public string SummaryLanguage { get; set; } = "English";
 
     /// <summary>Where the main window was when PageSmith last closed; null until then.</summary>
     public WindowPlacement? Window { get; set; }
@@ -64,15 +84,62 @@ public sealed class AppSettings
     public List<string> RecentFiles { get; set; } = [];
     public List<string> FavoriteTools { get; set; } = ["merge", "split", "compress", "pdf-to-word", "edit", "sign"];
 
-    [JsonIgnore]
-    public string AnthropicKey
+    /// <summary>The saved API key for an AI service, or the one in its usual environment variable.</summary>
+    public string KeyFor(AiProvider provider)
     {
-        get
+        var stored = SecretStore.Unprotect(provider switch
         {
-            var stored = SecretStore.Unprotect(ProtectedAnthropicKey);
-            return stored.Length > 0 ? stored : Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") ?? "";
+            AiProvider.Claude => ProtectedAnthropicKey,
+            AiProvider.Gemini => ProtectedGeminiKey,
+            _ => ProtectedOpenAiKey,
+        });
+        return stored.Length > 0 ? stored : AiService.KeyFromEnvironment(provider) ?? "";
+    }
+
+    /// <summary>Whether the key was typed into Settings (rather than coming from an environment variable).</summary>
+    public bool HasSavedKey(AiProvider provider) => provider switch
+    {
+        AiProvider.Claude => ProtectedAnthropicKey,
+        AiProvider.Gemini => ProtectedGeminiKey,
+        _ => ProtectedOpenAiKey,
+    } != "";
+
+    public void SetKey(AiProvider provider, string key)
+    {
+        var stored = string.IsNullOrWhiteSpace(key) ? "" : SecretStore.Protect(key.Trim());
+        switch (provider)
+        {
+            case AiProvider.Claude: ProtectedAnthropicKey = stored; break;
+            case AiProvider.Gemini: ProtectedGeminiKey = stored; break;
+            default: ProtectedOpenAiKey = stored; break;
         }
-        set => ProtectedAnthropicKey = SecretStore.Protect(value);
+    }
+
+    public string ModelFor(AiProvider provider) => provider switch
+    {
+        AiProvider.Claude => ClaudeModel,
+        AiProvider.Gemini => GeminiModel,
+        _ => OpenAiModel,
+    };
+
+    public void SetModel(AiProvider provider, string model)
+    {
+        model = string.IsNullOrWhiteSpace(model) ? AiService.DefaultModel(provider) : model.Trim();
+        switch (provider)
+        {
+            case AiProvider.Claude: ClaudeModel = model; break;
+            case AiProvider.Gemini: GeminiModel = model; break;
+            default: OpenAiModel = model; break;
+        }
+    }
+
+    /// <summary>The AI service with the saved key and model; explains where to add a missing key.</summary>
+    public AiService CreateAi(AiProvider provider)
+    {
+        var key = KeyFor(provider);
+        if (!AiService.HasKey(key))
+            throw new UserFacingException($"Add your {AiService.Company(provider)} API key in Settings › AI services to use {AiService.Describe(provider)}.");
+        return AiService.Create(provider, key, ModelFor(provider));
     }
 
     [JsonIgnore]
@@ -120,9 +187,9 @@ public sealed class AppSettings
     public ITranslator CreateTranslator() => Translator switch
     {
         TranslationProvider.LibreTranslate => new LibreTranslateTranslator(LibreTranslateUrl, LibreTranslateKey),
-        TranslationProvider.Claude => AnthropicKey.Length > 0
-            ? new ClaudeTranslator(AnthropicKey, ClaudeModel)
-            : throw new UserFacingException("Add your Anthropic API key in Settings › AI services to translate with Claude."),
+        TranslationProvider.Claude => new AiTranslator(CreateAi(AiProvider.Claude)),
+        TranslationProvider.Gemini => new AiTranslator(CreateAi(AiProvider.Gemini)),
+        TranslationProvider.OpenAI => new AiTranslator(CreateAi(AiProvider.OpenAI)),
         _ => new MyMemoryTranslator(MyMemoryEmail),
     };
 }

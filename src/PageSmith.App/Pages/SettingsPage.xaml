@@ -177,7 +177,9 @@
                         SelectedValuePath="Tag">
                         <ComboBoxItem Content="MyMemory (free, about 5,000 characters a day)" Tag="MyMemory" />
                         <ComboBoxItem Content="LibreTranslate (your own or a hosted server)" Tag="LibreTranslate" />
-                        <ComboBoxItem Content="Claude (Anthropic API key)" Tag="Claude" />
+                        <ComboBoxItem Content="Claude by Anthropic (API key below)" Tag="Claude" />
+                        <ComboBoxItem Content="Gemini by Google (API key below)" Tag="Gemini" />
+                        <ComboBoxItem Content="OpenAI (API key below)" Tag="OpenAI" />
                     </ComboBox>
                     <TextBlock Style="{StaticResource OptionHeader}" Text="MyMemory email (optional, raises the daily limit to 50,000 characters)" />
                     <ui:TextBox
@@ -199,37 +201,71 @@
                         PlaceholderText="API key (if the server needs one)" />
                 </StackPanel>
             </ui:CardExpander>
-            <ui:CardExpander Margin="0,0,0,4" IsExpanded="True">
-                <ui:CardExpander.Icon>
-                    <ui:SymbolIcon Symbol="Sparkle24" />
-                </ui:CardExpander.Icon>
-                <ui:CardExpander.Header>
-                    <StackPanel>
-                        <TextBlock FontWeight="SemiBold" Text="Claude by Anthropic" />
-                        <TextBlock Style="{StaticResource OptionHint}" Text="{Binding KeyStatus}" />
-                    </StackPanel>
-                </ui:CardExpander.Header>
-                <StackPanel>
-                    <TextBlock Style="{StaticResource OptionHint}" Text="Optional. With your own API key, Translate PDF can use Claude. Document text is sent to Anthropic only when you translate with Claude." />
-                    <ui:PasswordBox
-                        MaxWidth="420"
-                        Margin="0,6,0,0"
-                        HorizontalAlignment="Left"
-                        Password="{Binding AnthropicKey, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                        PlaceholderText="sk-ant-…" />
-                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
-                        <ui:HyperlinkButton
-                            Padding="0"
-                            Command="{Binding GetAnthropicKeyCommand}"
-                            Content="Get an API key" />
-                    </StackPanel>
-                    <TextBlock Style="{StaticResource OptionHeader}" Text="Model" />
-                    <ui:TextBox
-                        MaxWidth="260"
-                        HorizontalAlignment="Left"
-                        Text="{Binding ClaudeModel, UpdateSourceTrigger=LostFocus}" />
-                </StackPanel>
-            </ui:CardExpander>
+            <!--  Claude, Gemini and OpenAI: pick one in Summarize or Translate PDF  -->
+            <ItemsControl ItemsSource="{Binding AiServices}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type pages:AiServiceSettings}">
+                        <ui:CardExpander Margin="0,0,0,4">
+                            <ui:CardExpander.Icon>
+                                <ui:SymbolIcon Symbol="Sparkle24" />
+                            </ui:CardExpander.Icon>
+                            <ui:CardExpander.Header>
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                                    <TextBlock
+                                        Style="{StaticResource OptionHint}"
+                                        Text="{Binding KeyState}"
+                                        TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </ui:CardExpander.Header>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource OptionHint}" Text="{Binding Privacy}" />
+                                <TextBlock Style="{StaticResource OptionHeader}" Text="API key" />
+                                <ui:PasswordBox
+                                    Width="420"
+                                    HorizontalAlignment="Left"
+                                    Password="{Binding ApiKey, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                    PlaceholderText="{Binding KeyPlaceholder}" />
+                                <ui:HyperlinkButton
+                                    Margin="0,4,0,0"
+                                    Padding="0"
+                                    Command="{Binding GetKeyCommand}"
+                                    Content="Get an API key" />
+                                <TextBlock Style="{StaticResource OptionHeader}" Text="Model" />
+                                <StackPanel Orientation="Horizontal">
+                                    <ComboBox
+                                        Width="300"
+                                        IsEditable="True"
+                                        ItemsSource="{Binding Models}"
+                                        Text="{Binding Model, UpdateSourceTrigger=LostFocus}" />
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Command="{Binding LoadModelsCommand}"
+                                        Content="Load models"
+                                        ToolTip="List the models your key can use">
+                                        <ui:Button.Icon>
+                                            <ui:SymbolIcon Symbol="ArrowSync24" />
+                                        </ui:Button.Icon>
+                                    </ui:Button>
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Command="{Binding TestCommand}"
+                                        Content="Test"
+                                        ToolTip="Send a one-word request to check the key and model">
+                                        <ui:Button.Icon>
+                                            <ui:SymbolIcon Symbol="Checkmark24" />
+                                        </ui:Button.Icon>
+                                    </ui:Button>
+                                </StackPanel>
+                                <TextBlock
+                                    Margin="0,8,0,0"
+                                    Style="{StaticResource OptionHint}"
+                                    Text="{Binding Status}" />
+                            </StackPanel>
+                        </ui:CardExpander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
             <!--  Connection  -->
             <TextBlock Style="{StaticResource OptionHeader}" Text="Connection" />

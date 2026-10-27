@@ -1031,6 +1031,32 @@
     <!--  ============================== Intelligence  -->
     <DataTemplate DataType="{x:Type tools:SummarizeController}">
         <StackPanel>
+            <TextBlock Style="{StaticResource OptionHeader}" Text="Summarize with" />
+            <ComboBox SelectedValue="{Binding Service}" SelectedValuePath="Tag">
+                <ComboBoxItem Content="This PC (offline, private)" Tag="OnThisPc" />
+                <ComboBoxItem Content="Claude by Anthropic (online)" Tag="Claude" />
+                <ComboBoxItem Content="Gemini by Google (online)" Tag="Gemini" />
+                <ComboBoxItem Content="OpenAI (online)" Tag="OpenAI" />
+            </ComboBox>
+            <TextBlock Style="{StaticResource OptionHint}" Text="{Binding ServiceNote}" />
+            <StackPanel Margin="0,2,0,4" Visibility="{Binding NeedsKey, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock
+                    FontWeight="SemiBold"
+                    Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                    Text="No API key saved for this service yet."
+                    TextWrapping="Wrap" />
+                <ui:HyperlinkButton
+                    Padding="0"
+                    Command="{Binding OpenAiSettingsCommand}"
+                    Content="Add it in Settings › AI services" />
+            </StackPanel>
+            <StackPanel Visibility="{Binding UsesAi, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{StaticResource OptionHeader}" Text="Summary language" />
+                <ComboBox
+                    IsEditable="True"
+                    ItemsSource="{Binding Languages}"
+                    Text="{Binding Language}" />
+            </StackPanel>
             <TextBlock Style="{StaticResource OptionHeader}" Text="Summary length" />
             <WrapPanel>
                 <RadioButton
@@ -1046,7 +1072,6 @@
                     IsChecked="{Binding Length, Converter={StaticResource EnumEquals}, ConverterParameter=Long}"
                     Style="{StaticResource Segment}" />
             </WrapPanel>
-            <TextBlock Style="{StaticResource OptionHint}" Text="Picks the key sentences and keywords on this PC. Your document never leaves your computer." />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Save as" />
             <WrapPanel>
                 <RadioButton
@@ -1157,7 +1182,9 @@
             <ComboBox SelectedValue="{Binding Provider}" SelectedValuePath="Tag">
                 <ComboBoxItem Content="MyMemory (free, daily limit)" Tag="MyMemory" />
                 <ComboBoxItem Content="LibreTranslate (your server)" Tag="LibreTranslate" />
-                <ComboBoxItem Content="Claude (best quality, API key)" Tag="Claude" />
+                <ComboBoxItem Content="Claude by Anthropic (API key)" Tag="Claude" />
+                <ComboBoxItem Content="Gemini by Google (API key)" Tag="Gemini" />
+                <ComboBoxItem Content="OpenAI (API key)" Tag="OpenAI" />
             </ComboBox>
             <TextBlock Style="{StaticResource OptionHint}" Text="Translation needs the internet. Configure services in Settings › AI services." />
             <CheckBox

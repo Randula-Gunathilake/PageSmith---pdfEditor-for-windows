@@ -130,14 +130,12 @@ public sealed class LibreTranslateTranslator(string serverUrl, string? apiKey) :
     }
 }
 
-/// <summary>Claude (Anthropic API key): best quality, keeps terminology consistent within a batch.</summary>
-public sealed class ClaudeTranslator(string apiKey, string model = ClaudeService.DefaultModel) : ITranslator
+/// <summary>An AI service (Claude, Gemini or OpenAI, with an API key): best quality, consistent terminology within a batch.</summary>
+public sealed class AiTranslator(AiService ai) : ITranslator
 {
-    private readonly ClaudeService _claude = new(apiKey, model);
-
-    public string Name => "Claude";
+    public string Name => ai.Name;
     public int MaxBatchCharacters => 12000;
 
     public Task<IReadOnlyList<string>> TranslateAsync(IReadOnlyList<string> segments, string? sourceLanguage, string targetLanguage, CancellationToken ct) =>
-        _claude.TranslateAsync(segments, sourceLanguage == null ? null : Languages.NameOf(sourceLanguage), Languages.NameOf(targetLanguage), ct);
+        ai.TranslateAsync(segments, sourceLanguage == null ? null : Languages.NameOf(sourceLanguage), Languages.NameOf(targetLanguage), ct);
 }

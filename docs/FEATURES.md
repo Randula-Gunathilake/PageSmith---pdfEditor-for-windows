@@ -135,8 +135,8 @@ batch limits other than the machine's memory. Everything runs locally unless the
 | Sign | Signature pad (draw, type in a handwriting font, upload with background removal); initials, name, date, text, stamp; **digital signature** with a certificate from Windows, a PFX file or a new self-signed one, optional trusted timestamp (online). Requesting signatures from others is not included (needs an online service) | Offline |
 | Redact | Areas, clicked words, search (case, whole word, regex) and presets (email, phone, card with Luhn check, SSN, IBAN, URL, IP, dates) with a review list; redacted pages are rasterized so the content is gone | Offline |
 | Compare | Side-by-side view with word-level highlights and a change list, visual overlay; writes highlighted copies and a change report | Offline |
-| Summarizer | On-device extractive summary and keywords (v1 frequency scoring, v2 TextRank + embeddings). A Claude engine exists in PageSmith.Core but is not offered in the app | Offline |
-| Translate | Layout-preserving translation through MyMemory, LibreTranslate or Claude | **Online** |
+| Summarizer | On-device extractive summary and keywords (v1 frequency scoring, v2 TextRank + embeddings), or a written summary by Claude, Gemini or OpenAI with the user's own API key, in any language | Offline, or **online** with an AI service |
+| Translate | Layout-preserving translation through MyMemory, LibreTranslate, Claude, Gemini or OpenAI | **Online** |
 | Workflows | Reusable chains of tools with saved options, run on many files | Offline |
 | Continue with another tool | Every result can be passed into the next tool | – |
 

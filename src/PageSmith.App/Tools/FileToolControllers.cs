@@ -587,18 +587,73 @@ public sealed partial class SummarizeController() : ToolController("summarize")
     [ObservableProperty] public partial SummaryLength Length { get; set; } = SummaryLength.Medium;
     [ObservableProperty] public partial string OutputFormat { get; set; } = "Markdown";
 
-    // The app only offers the on-device summarizer. SummarizeTool still supports SummaryEngine.Claude
-    // for a future online option; it is deliberately not exposed here.
+    /// <summary>This PC, or the online AI service picked from the list.</summary>
+    [ObservableProperty] public partial SummaryService Service { get; set; } = AppServices.Settings.Summarizer;
+
+    [ObservableProperty] public partial string Language { get; set; } = AppServices.Settings.SummaryLanguage;
+
+    public IReadOnlyList<string> Languages { get; } = Core.Intelligence.Languages.All.Select(l => l.Name).ToList();
+
+    private AiProvider? Provider => Service switch
+    {
+        SummaryService.Claude => AiProvider.Claude,
+        SummaryService.Gemini => AiProvider.Gemini,
+        SummaryService.OpenAI => AiProvider.OpenAI,
+        _ => null,
+    };
+
+    public bool UsesAi => Provider != null;
+
+    public string ServiceNote => Provider is { } p
+        ? $"{AiService.Describe(p)} writes the summary in its own words. The document's text is sent to {AiService.Company(p)} with your API key, so this needs the internet."
+        : "Picks the key sentences and keywords on this PC. Your document never leaves your computer.";
+
+    /// <summary>An AI service is picked but has no API key yet.</summary>
+    public bool NeedsKey => Provider is { } p && !AiService.HasKey(AppServices.Settings.KeyFor(p));
+
+    partial void OnServiceChanged(SummaryService value)
+    {
+        OnPropertyChanged(nameof(UsesAi));
+        OnPropertyChanged(nameof(ServiceNote));
+        OnPropertyChanged(nameof(NeedsKey));
+    }
+
+    public override Task OnShownAsync()
+    {
+        // A key may have been added in Settings since.
+        OnPropertyChanged(nameof(NeedsKey));
+        return Task.CompletedTask;
+    }
+
+    [RelayCommand]
+    private static void OpenAiSettings() => AppServices.NavigateTo(typeof(Pages.SettingsPage));
+
+    public override Task SeedDemoAsync()
+    {
+        Service = SummaryService.Gemini;
+        Language = "Spanish";
+        return Task.CompletedTask;
+    }
+
+    public override string? Validate() =>
+        base.Validate() ?? (NeedsKey && Provider is { } p
+            ? $"Add your {AiService.Company(p)} API key in Settings › AI services, or summarize on this PC."
+            : null);
+
     protected override Task<ToolResult> RunCoreAsync(IProgress<ToolProgress> progress, CancellationToken ct)
     {
         var f = Files[0];
         var ext = OutputFormat switch { "PDF" => ".pdf", "Text" => ".txt", _ => ".md" };
+        AppServices.Settings.Summarizer = Service;
+        AppServices.Settings.SummaryLanguage = Language;
+        AppServices.SaveSettings();
         return SummarizeTool.RunAsync(new SummarizeOptions
         {
             Input = f.ToInput(),
             OutputPath = OutputPaths.Unique(OutputDirectory(f.Path), Path.GetFileNameWithoutExtension(f.Path) + "_summary" + ext),
             Length = Length,
-            Engine = SummaryEngine.Offline,
+            Ai = Provider is { } p ? AppServices.Settings.CreateAi(p) : null,
+            OutputLanguage = Language,
         }, progress, ct);
     }
 }
@@ -619,6 +674,19 @@ public sealed partial class TranslateController() : ToolController("translate")
         Target ??= TargetLanguages.First(l => l.Code == "es");
         return Task.CompletedTask;
     }
+
+    private AiProvider? AiProviderPicked => Provider switch
+    {
+        TranslationProvider.Claude => AiProvider.Claude,
+        TranslationProvider.Gemini => AiProvider.Gemini,
+        TranslationProvider.OpenAI => AiProvider.OpenAI,
+        _ => null,
+    };
+
+    public override string? Validate() =>
+        base.Validate() ?? (AiProviderPicked is { } p && !AiService.HasKey(AppServices.Settings.KeyFor(p))
+            ? $"Add your {AiService.Company(p)} API key in Settings › AI services, or pick another translation service."
+            : null);
 
     protected override Task<ToolResult> RunCoreAsync(IProgress<ToolProgress> progress, CancellationToken ct)
     {
