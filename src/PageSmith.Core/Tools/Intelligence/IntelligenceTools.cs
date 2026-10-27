@@ -10,15 +10,6 @@ using PdfSharp.Drawing;
 
 namespace PageSmith.Core.Tools.Intelligence;
 
-public enum SummaryEngine
-{
-    /// <summary>On-device extractive summary (no internet).</summary>
-    Offline,
-
-    /// <summary>Abstractive summary by Claude (internet and an Anthropic API key).</summary>
-    Claude,
-}
-
 public sealed record SummarizeOptions
 {
     public required InputFile Input { get; init; }
@@ -27,8 +18,11 @@ public sealed record SummarizeOptions
     public string? OutputPath { get; init; }
 
     public SummaryLength Length { get; init; } = SummaryLength.Medium;
-    public SummaryEngine Engine { get; init; } = SummaryEngine.Offline;
-    public string? ApiKey { get; init; }
+
+    /// <summary>An online AI service writes the summary; null summarizes on this PC (no internet).</summary>
+    public AiService? Ai { get; init; }
+
+    /// <summary>Language of an AI summary (the on-device summary keeps the document's sentences).</summary>
     public string OutputLanguage { get; init; } = "English";
     public string? Pages { get; init; }
 }
@@ -62,12 +56,11 @@ public static class SummarizeTool
 
         var title = Path.GetFileNameWithoutExtension(o.Input.Path);
         string markdown;
-        if (o.Engine == SummaryEngine.Claude)
+        if (o.Ai is { } ai)
         {
-            if (!ClaudeService.HasKey(o.ApiKey)) throw new UserFacingException("Add your Anthropic API key in Settings › AI services to use Claude summaries.");
-            scope.Report(0.3, "Asking Claude for a summary");
-            markdown = $"# {title}\n\n" + await new ClaudeService(o.ApiKey!).SummarizeAsync(text, o.Length, o.OutputLanguage, ct).ConfigureAwait(false);
-            result.Summary = "Summary written by Claude.";
+            scope.Report(0.3, $"Asking {ai.Name} for a summary");
+            markdown = $"# {title}\n\n" + await ai.SummarizeAsync(text, o.Length, o.OutputLanguage, ct).ConfigureAwait(false);
+            result.Summary = $"Summary written by {ai.Name} ({ai.Model}).";
         }
         else
         {

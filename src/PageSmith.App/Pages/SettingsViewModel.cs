@@ -1,8 +1,10 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PageSmith.App.Infrastructure;
 using PageSmith.Core.Common;
+using PageSmith.Core.Intelligence;
 using PageSmith.Core.Net;
 using PageSmith.Core.Ocr;
 using PageSmith.Core.Office;
@@ -83,21 +85,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         set { S.LibreTranslateKey = value; Save(); }
     }
 
-    public string AnthropicKey
-    {
-        get => S.AnthropicKey;
-        set { S.AnthropicKey = value; Save(); OnPropertyChanged(nameof(KeyStatus)); }
-    }
-
-    public string ClaudeModel
-    {
-        get => S.ClaudeModel;
-        set { S.ClaudeModel = string.IsNullOrWhiteSpace(value) ? Core.Intelligence.ClaudeService.DefaultModel : value.Trim(); Save(); }
-    }
-
-    public string KeyStatus => S.AnthropicKey.Length == 0
-        ? "No key saved. Claude translation stays off; everything else works."
-        : "A key is saved for this Windows account (encrypted with Windows Data Protection).";
+    /// <summary>Claude, Gemini and OpenAI: a key, a model and a test for each.</summary>
+    public IReadOnlyList<AiServiceSettings> AiServices { get; } = Enum.GetValues<AiProvider>().Select(p => new AiServiceSettings(p)).ToList();
 
     public string OfficeStatus
     {
@@ -147,9 +136,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         AppServices.ShowInFolder(AppSettings.Folder);
     }
 
-    [RelayCommand]
-    private static void GetAnthropicKey() => AppServices.OpenUri("https://console.anthropic.com/settings/keys");
-
     // ------------------------------------------------------------------ opening PDFs
 
     private static string Exe => Environment.ProcessPath ?? "";
@@ -195,4 +181,138 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     private static void Save() => AppServices.SaveSettings();
+}
+
+/// <summary>One online AI service in Settings: its API key, the model to use, and a quick test.</summary>
+public sealed partial class AiServiceSettings : ObservableObject
+{
+    private static AppSettings S => AppServices.Settings;
+
+    public AiServiceSettings(AiProvider provider)
+    {
+        Provider = provider;
+        Models = [Model];
+        if (!Models.Contains(AiService.DefaultModel(provider))) Models.Add(AiService.DefaultModel(provider));
+        KeyState = DescribeKey();
+        Status = "";
+    }
+
+    public AiProvider Provider { get; }
+
+    public string Title => Provider == AiProvider.OpenAI ? "OpenAI" : $"{AiService.Describe(Provider)} by {AiService.Company(Provider)}";
+
+    public string KeyPlaceholder => Provider switch
+    {
+        AiProvider.Claude => "sk-ant-…",
+        AiProvider.Gemini => "AIza…",
+        _ => "sk-…",
+    };
+
+    public string Privacy =>
+        $"Used only when you pick {AiService.Describe(Provider)} in Summarize or Translate PDF. The document's text is then sent to {AiService.Company(Provider)}, with your key.";
+
+    public string ApiKey
+    {
+        get => S.HasSavedKey(Provider) ? S.KeyFor(Provider) : "";
+        set
+        {
+            S.SetKey(Provider, value);
+            AppServices.SaveSettings();
+            KeyState = DescribeKey();
+            Status = "";
+        }
+    }
+
+    public string Model
+    {
+        get => S.ModelFor(Provider);
+        set
+        {
+            S.SetModel(Provider, value);
+            AppServices.SaveSettings();
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Models to pick from; "Load models" fills it from the service.</summary>
+    public ObservableCollection<string> Models { get; }
+
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(TestCommand), nameof(LoadModelsCommand))]
+    public partial bool IsBusy { get; set; }
+
+    /// <summary>Whether a key is saved, shown on the card.</summary>
+    [ObservableProperty] public partial string KeyState { get; set; }
+
+    /// <summary>The outcome of the last test or model list.</summary>
+    [ObservableProperty] public partial string Status { get; set; }
+
+    private string DescribeKey()
+    {
+        if (S.HasSavedKey(Provider)) return "A key is saved for this Windows account, encrypted with Windows Data Protection.";
+        return AiService.HasKey(S.KeyFor(Provider))
+            ? "Using the key from an environment variable."
+            : "No key saved. Everything else in PageSmith works without one.";
+    }
+
+    private bool CanCall() => !IsBusy;
+
+    /// <summary>Asks the service for a one-word answer with the saved key and model.</summary>
+    [RelayCommand(CanExecute = nameof(CanCall))]
+    private async Task TestAsync()
+    {
+        IsBusy = true;
+        Status = $"Asking {AiService.Describe(Provider)}…";
+        try
+        {
+            await S.CreateAi(Provider).TestAsync();
+            Status = $"Working: {Model} answered.";
+        }
+        catch (UserFacingException ex)
+        {
+            Status = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            AppServices.LogError(ex);
+            Status = $"The test failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>Lists the models the key can use.</summary>
+    [RelayCommand(CanExecute = nameof(CanCall))]
+    private async Task LoadModelsAsync()
+    {
+        IsBusy = true;
+        Status = "Loading models…";
+        try
+        {
+            var models = await S.CreateAi(Provider).ListModelsAsync();
+            var current = Model;
+            Models.Clear();
+            foreach (var m in models) Models.Add(m);
+            if (!Models.Contains(current)) Models.Insert(0, current);
+            OnPropertyChanged(nameof(Model));
+            Status = $"{models.Count} models available. Pick one, or type a model name.";
+        }
+        catch (UserFacingException ex)
+        {
+            Status = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            AppServices.LogError(ex);
+            Status = $"Couldn't load the models: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void GetKey() => AppServices.OpenUri(AiService.KeyPage(Provider));
 }

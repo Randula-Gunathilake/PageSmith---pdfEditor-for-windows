@@ -11,7 +11,7 @@ offline desktop app that works on the open document. This file tracks:
 For the iLovePDF research behind the feature list (plans, every tool's options, the Free vs
 Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 
-**Current version:** 0.3.1 (preview), last updated 2026-10-27.
+**Current version:** 0.4.0 (preview), last updated 2026-10-28.
 
 ---
 
@@ -20,7 +20,8 @@ Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 | Area | State |
 |---|---|
 | iLovePDF analysis | Done: 34 features (33 tools + Workflows), Free vs Premium limits, mapping → [docs/FEATURES.md](docs/FEATURES.md) |
-| PDF engine (`PageSmith.Core`) | Done for all 33 tools and the reader; 96 automated tests, all passing |
+| PDF engine (`PageSmith.Core`) | Done for all 33 tools and the reader; 113 automated tests, all passing |
+| Online AI services (new in 0.4.0) | Claude, Gemini or OpenAI, picked from a list, for summaries and translation, with your own API keys (§1.3) |
 | Windows app (`PageSmith.App`) | **All 33 tool screens working**, plus Home, Workflows, Settings and About |
 | PDF reader (new in 0.3.0) | **Working:** documents in tabs, viewer, find, text selection, comments, print, and every PDF tool on the open document with undo (§1.2) |
 | Still to check by hand | A real scanner, a real camera, a real printer, *Retry* with the PC actually offline, and opening PDFs from Explorer (§2.1) |
@@ -71,8 +72,8 @@ How the tools were checked:
 | 29 | Sign PDF | Offline (timestamp online) | Draw, type or upload a signature; initials, name, date, text, stamp; **certificate digital signatures** from Windows, a .pfx file or a new self-signed one | Unit tests (signature verifies and is visible), UI run |
 | 30 | Redact PDF | Offline | Areas, words, search (match case, whole words, regex) and patterns: email, phone, card numbers with Luhn check, SSN, IBAN, IP, web addresses, dates | Unit tests, UI run |
 | 31 | Compare PDF | Offline | Side by side with highlighted changes, change list that jumps to each change, visual overlay; report and highlighted copies | Unit tests, UI run |
-| 32 | AI Summarizer | Offline | On-device extractive summary and keywords as Markdown, PDF or text | Unit tests, UI run |
-| 33 | Translate PDF | **Online** | MyMemory (free), LibreTranslate or Claude; layout kept | Unit tests (engine); online services not exercised in tests |
+| 32 | AI Summarizer | Offline, or online with an AI service | On-device extractive summary and keywords, or a written summary by Claude, Gemini or OpenAI in the language you pick; Markdown, PDF or text | Unit tests (engine, AI requests and answers), UI run (on-device) |
+| 33 | Translate PDF | **Online** | MyMemory (free), LibreTranslate, Claude, Gemini or OpenAI; layout kept | Unit tests (engine, AI requests and answers); online services not exercised in tests |
 | 34 | Workflows | Offline | **Premium-only on iLovePDF**: 3 presets plus your own chains of 14 step types | Unit tests, screen check |
 
 Not included: iLovePDF's *request signatures from other people*. It needs an online service
@@ -173,7 +174,22 @@ and every tool works on the document in front of you.
   - Office engine;
   - OCR language;
   - translation service;
-  - Claude API key for translation, encrypted with Windows DPAPI.
+  - **AI services:** an API key and a model for each of Claude (Anthropic), Gemini (Google) and
+    OpenAI. Keys are encrypted with Windows DPAPI, or read from `ANTHROPIC_API_KEY`,
+    `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) and `OPENAI_API_KEY`. *Load models* lists the models
+    your key can use; *Test* sends a one-word request to check the key and model.
+- **Online AI services (0.4.0).** Summarize and Translate PDF each have a list to pick the service:
+  this PC (summaries only), MyMemory or LibreTranslate (translation only), Claude, Gemini or
+  OpenAI. All three AI services get the same instructions, so results read alike.
+  - Claude uses Anthropic's official SDK (default model `claude-opus-5-5`), with structured JSON
+    output for translations and the server-side fallback when a safety classifier declines.
+  - Gemini uses the Gemini API's `generateContent` (default `gemini-3.8-flash`) with a JSON
+    response schema.
+  - OpenAI uses the Responses API (default `gpt-6-astra`) with a strict JSON schema, and
+    `store: false` so OpenAI doesn't keep your documents for later retrieval.
+  - Document text leaves the PC only when you pick one of these services, and only to that
+    company. They check the connection first and offer *Retry* when offline; a missing or wrong
+    key, a model the key can't use, rate limits and refusals each get a clear message.
 - **About** shows the iLovePDF Free vs Premium catalog next to what PageSmith includes.
 - **Command line.** `PageSmith.exe file.pdf …` opens the files in tabs. Developer options are in §5.6.
 - **Errors** are logged to `%APPDATA%\PageSmith\pagesmith.log` and shown in-app, never as crash dialogs.
@@ -207,8 +223,8 @@ and every tool works on the document in front of you.
   PDF viewer. It now shows and prints, and the signature still verifies.
 - **Dropdowns.** A filled dropdown now shows its value in Windows' built-in PDF viewer too.
 - **Dark mode.** Titles and file names on tool pages were dark on dark.
-- **AI Summarizer** is now offline-only in the app. The Claude engine (`SummaryEngine.Claude`,
-  `ClaudeService`) is still in `PageSmith.Core`, untouched, for a future online option.
+- **AI Summarizer.** In 0.2.0 the summarizer was offline-only in the app. Since 0.4.0 it can also
+  use Claude, Gemini or OpenAI, picked from a list (§1.3).
 
 ### 1.5 Known issues
 
@@ -257,6 +273,10 @@ Work happens on `feature/*` branches cut from `develop` (see §6).
   (with a timestamp) show the offline bar, and that **Retry** works once back online.
 - [ ] **Mouse and pen:** in every page-editor tool, check drawing, moving and resizing with mouse,
   touch and pen. In the reader, check selecting text, the hand tool and dragging thumbnails.
+- [ ] **AI services with real keys:** in Settings, *Test* and *Load models* for Claude, Gemini and
+  OpenAI; then summarize (short and long, another language) and translate a few pages with each.
+  The automated tests check requests and answers offline; a fake-key call confirmed each service's
+  address and key header, but no real summary has been made yet.
 - [ ] **Printer:** print a document (all pages, a range, the current page) on a real printer, in
   portrait and landscape.
 - [ ] **Opening from Explorer:** use *Settings → Opening PDFs*, choose PageSmith in Windows'
@@ -413,7 +433,10 @@ dotnet run --project src/PageSmith.App
 dotnet test tests/PageSmith.Tests
 ```
 
-- **96 tests, under a minute.** They build real PDFs, render them, and check the output of every
+- **AI service tests** (`AiServiceTests`) check each service's request and how its answers,
+  refusals, cut-off answers, model lists and errors are read, against the documented JSON. They
+  send nothing, so they need neither the internet nor API keys.
+- **113 tests, under a minute.** They build real PDFs, render them, and check the output of every
   engine. Some render the output with Windows' PDF engine to check that things are actually
   visible: the signature box, filled dropdowns, black & white scans, highlights and notes.
 - **Reader tests** (`ReaderTests`) cover text search and selection, bookmarks, links, comments,
