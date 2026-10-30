@@ -38,7 +38,14 @@ dotnet run --project src/PageSmith.App
 dotnet test tests/PageSmith.Tests
 ```
 
-To build a standalone `PageSmith.exe` that runs without .NET installed:
+To build an installer (`artifacts/installer/PageSmith-Setup-<version>-win-x64.exe`) for other PCs,
+with [Inno Setup 6](https://jrsoftware.org/isinfo.php) installed:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1
+```
+
+Or, to build a standalone `PageSmith.exe` that runs without .NET installed:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts/publish.ps1 -Zip

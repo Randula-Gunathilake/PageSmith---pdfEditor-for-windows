@@ -26,7 +26,7 @@ Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 | PDF reader (new in 0.3.0) | **Working:** documents in tabs, viewer, find, text selection, comments, print, and every PDF tool on the open document with undo (§1.2) |
 | Still to check by hand | A real scanner, a real camera, a real printer, *Retry* with the PC actually offline, and opening PDFs from Explorer (§2.1) |
 | Machine-learning features | Planned for v2.0 (§4) |
-| Packaging | Self-contained single-file `.exe` and zip via `scripts/publish.ps1`; no installer yet |
+| Packaging | Installer `PageSmith-Setup-<version>-win-x64.exe` via `scripts/build-installer.ps1` (§5.5), plus a self-contained single-file `.exe` and zip via `scripts/publish.ps1` |
 
 How the tools were checked:
 
@@ -254,8 +254,8 @@ and every tool works on the document in front of you.
 - **Compiler warnings.** A Release build shows about 8 warnings: nullability in
   `MicrosoftOffice.cs` and `WordDiff.cs`, and obsolete PdfPig/PDFsharp APIs. They are harmless
   but should be cleaned up.
-- **No installer or code signing yet.** Windows SmartScreen may warn the first time you run a
-  downloaded `PageSmith.exe`.
+- **No code signing yet.** Windows SmartScreen may warn the first time you run a downloaded
+  installer or `PageSmith.exe` (*More info → Run anyway*).
 
 ---
 
@@ -302,13 +302,12 @@ Work happens on `feature/*` branches cut from `develop` (see §6).
 - [ ] Release:
   1. Set `<Version>1.0.0</Version>` in `Directory.Build.props`.
   2. Create `release/1.0.0` from `develop`.
-  3. Run `scripts/publish.ps1 -Zip`.
+  3. Run `scripts/publish.ps1 -Zip` and `scripts/build-installer.ps1 -SkipTests`.
   4. Merge into `main` and tag `v1.0.0`.
   5. Merge back into `develop`.
-  6. Attach the zip to a GitHub release.
+  6. Attach the installer and the zip to a GitHub release.
 - [ ] Nice to have:
-  - an installer (MSIX or Inno Setup) with *Open with* file associations and Start-menu shortcut;
-  - code signing;
+  - code signing (for the installer and `PageSmith.exe`);
   - GitHub Actions CI (`windows-latest`: build, test, publish artifact);
   - an Explorer context menu ("Compress with PageSmith", "Merge with PageSmith").
 
@@ -363,6 +362,7 @@ downloaded, PageSmith asks first, checks the connection, and offers *Retry* if o
 | [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (10.0.100 or later) | Developed with 10.0.401. Install with `winget install Microsoft.DotNet.SDK.10`. Check with `dotnet --version`. |
 | Git | To clone the repository. |
 | Internet access for the **first** build only | NuGet downloads the packages once. After that, building and running work offline. |
+| [Inno Setup 6](https://jrsoftware.org/isinfo.php) (only for the installer) | Install with `winget install --id JRSoftware.InnoSetup -e --scope user`. Built with 6.7.3. |
 | An IDE (optional) | Visual Studio 2026 with the *.NET desktop development* workload, JetBrains Rider, or VS Code with C# Dev Kit. The command line alone is enough. |
 
 Optional components the app uses at run time if they are present:
@@ -489,6 +489,26 @@ dotnet publish src/PageSmith.App -c Release -r win-x64 --self-contained false -o
 `artifacts/` is git-ignored. Copy the `.exe` (or the zip) to any Windows 10/11 x64 PC and run
 it; nothing needs installing.
 
+**The installer.** To build `artifacts/installer/PageSmith-Setup-<version>-<runtime>.exe`, which
+installs PageSmith on other PCs like any Windows app:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1
+```
+
+- It runs `publish.ps1 -Folder` (tests included; pass `-SkipTests` to skip them, `-Runtime
+  win-arm64` for ARM64), then compiles `installer/PageSmith.iss` with Inno Setup 6.
+- The setup works offline, needs no .NET on the target PC, and asks whether to install **only for
+  me** (no admin rights, `%LOCALAPPDATA%\Programs\PageSmith`) or **for all users** (Program Files).
+  It adds a Start-menu shortcut, an optional desktop shortcut and, optionally, the same *Open with*
+  entry as *Settings → Opening PDFs*. It follows the Windows light or dark theme.
+- Running a newer installer upgrades in place and offers to close a running PageSmith. Uninstall
+  from *Settings → Apps*; it asks whether to delete your settings, API keys and workflows too.
+- Silent install, for example from a script: `PageSmith-Setup-<version>-win-x64.exe /VERYSILENT
+  /CURRENTUSER` installs with the default choices (desktop shortcut and *Open with*). Add
+  `/MERGETASKS="!desktopicon,!openwith"` to skip them, or use `/ALLUSERS` from an admin prompt.
+- The wizard images in `installer/` come from `tools/IconGen`; rerun it after changing the icon.
+
 ### 5.6 Developer notes
 
 - **Project layout:**
@@ -498,6 +518,8 @@ it; nothing needs installing.
   Directory.Build.props        shared target framework, version, nullable settings
   docs/FEATURES.md             iLovePDF analysis and PageSmith mapping
   scripts/publish.ps1          release build script
+  scripts/build-installer.ps1  builds the Inno Setup installer from installer/PageSmith.iss
+  installer/                   PageSmith.iss and the wizard images
   src/PageSmith.Core/          all PDF work, no UI: Tools/, Pdf/, Text/, Imaging/, Ocr/, Office/, Intelligence/, Workflows/, Net/
   src/PageSmith.App/           WPF app:
     Controls/                  the reader: DocumentTabs, DocumentView (toolbar, panels, find, tool mode),
@@ -511,7 +533,7 @@ it; nothing needs installing.
     Infrastructure/            registry, settings, services, PdfPrinter, WebPageCapture (HTML), ScanSources (WIA)
     Pages/                     Home, Workflows, Settings, About
   tests/PageSmith.Tests/       xUnit tests for the engines
-  tools/IconGen/               renders Assets/PageSmith.ico and PNG icons
+  tools/IconGen/               renders Assets/PageSmith.ico, PNG icons and the installer's wizard images
   ```
 
 - **Adding a tool:**
