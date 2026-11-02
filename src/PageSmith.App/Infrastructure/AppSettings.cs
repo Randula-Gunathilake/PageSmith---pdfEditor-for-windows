@@ -1,8 +1,10 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using PageSmith.App.Controls;
 using PageSmith.Core.Common;
 using PageSmith.Core.Intelligence;
+using PageSmith.Core.Rendering;
 using PageSmith.Core.Tools.Convert;
 
 namespace PageSmith.App.Infrastructure;
@@ -44,6 +46,9 @@ public enum SummaryService
     OpenAI,
 }
 
+/// <summary>Where a document was left: its page and zoom.</summary>
+public sealed record ReadingPlace(string Path, int Page, ZoomMode Mode, double Zoom);
+
 /// <summary>User preferences, saved as JSON in %APPDATA%\PageSmith. Secrets are DPAPI-encrypted.</summary>
 public sealed class AppSettings
 {
@@ -80,6 +85,22 @@ public sealed class AppSettings
 
     /// <summary>Whether the reader shows the All tools pane.</summary>
     public bool ReaderToolsPane { get; set; } = true;
+
+    /// <summary>How the reader lays out pages.</summary>
+    public PageLayout ReaderLayout { get; set; } = PageLayout.Auto;
+
+    /// <summary>Where recently read documents were left, most recent first.</summary>
+    public List<ReadingPlace> ReadingPlaces { get; set; } = [];
+
+    public ReadingPlace? PlaceFor(string path) =>
+        ReadingPlaces.FirstOrDefault(p => string.Equals(p.Path, path, StringComparison.OrdinalIgnoreCase));
+
+    public void RememberPlace(ReadingPlace place)
+    {
+        ReadingPlaces.RemoveAll(p => string.Equals(p.Path, place.Path, StringComparison.OrdinalIgnoreCase));
+        ReadingPlaces.Insert(0, place);
+        if (ReadingPlaces.Count > 100) ReadingPlaces.RemoveRange(100, ReadingPlaces.Count - 100);
+    }
 
     public List<string> RecentFiles { get; set; } = [];
     public List<string> FavoriteTools { get; set; } = ["merge", "split", "compress", "pdf-to-word", "edit", "sign"];

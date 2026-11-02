@@ -95,7 +95,24 @@ internal sealed class StressRun(MainWindow window, string reportPath)
         }
 
         var workspace = AppServices.Documents;
+        // The slowest jobs on the UI thread while the document opens: what makes the window stop responding.
+        var slowest = new List<(double Ms, string What)>();
+        var started = new Dictionary<DispatcherOperation, long>();
+        void OnStarted(object? s, DispatcherHookEventArgs e) => started[e.Operation] = Stopwatch.GetTimestamp();
+        void OnCompleted(object? s, DispatcherHookEventArgs e)
+        {
+            if (!started.Remove(e.Operation, out var at)) return;
+            var ms = Stopwatch.GetElapsedTime(at).TotalMilliseconds;
+            if (ms < 40) return;
+            var method = typeof(DispatcherOperation).GetField("_method", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(e.Operation) as Delegate;
+            slowest.Add((ms, $"{e.Operation.Priority} {method?.Method.DeclaringType?.FullName}.{method?.Method.Name}"));
+        }
+        window.Dispatcher.Hooks.OperationStarted += OnStarted;
+        window.Dispatcher.Hooks.OperationCompleted += OnCompleted;
         await Step("open", () => workspace.OpenAsync(files));
+        window.Dispatcher.Hooks.OperationStarted -= OnStarted;
+        window.Dispatcher.Hooks.OperationCompleted -= OnCompleted;
+        _lines.Add("  slowest UI jobs: " + string.Join("; ", slowest.OrderByDescending(j => j.Ms).Take(5).Select(j => $"{j.Ms:0} ms {j.What}")));
         var view = window.ActiveView ?? throw new InvalidOperationException("No document opened.");
         var viewer = view.PageView;
         await Step("first pages drawn", () => Task.Delay(1500));
@@ -125,31 +142,120 @@ internal sealed class StressRun(MainWindow window, string reportPath)
                 _lines.Add("  thumbnails are hidden");
                 return;
             }
-            // Scrolling the pages down steadily should only ever move the thumbnails down too.
-            int reversals = 0, direction = 0, jumps = 0;
-            var last = thumbs.VerticalOffset;
-            for (var i = 0; i < 160; i++)
+            // Scrolling the pages down steadily should only ever move the thumbnails down too: slowly,
+            // in fast flicks, and zoomed out (where the page changes often).
+            async Task Follow(string how, double step, int steps)
             {
-                viewer.ScrollBy(60);
-                await Task.Delay(16);
-                var now = thumbs.VerticalOffset;
-                var moved = Math.Sign(Math.Round(now - last));
-                if (moved != 0)
+                int reversals = 0, direction = 0, jumps = 0;
+                var last = thumbs.VerticalOffset;
+                var trail = new List<string>();
+                for (var i = 0; i < steps; i++)
                 {
-                    if (direction != 0 && moved != direction) reversals++;
-                    direction = moved;
+                    viewer.ScrollBy(step);
+                    await Task.Delay(16);
+                    var now = thumbs.VerticalOffset;
+                    var moved = Math.Sign(Math.Round(now - last));
+                    if (moved != 0)
+                    {
+                        if (direction != 0 && moved != direction) reversals++;
+                        direction = moved;
+                    }
+                    if (Math.Abs(now - last) > thumbs.ViewportHeight) jumps++;
+                    if (trail.Count < 40) trail.Add($"{viewer.CurrentPage + 1}:{now:0}");
+                    last = now;
                 }
-                if (Math.Abs(now - last) > thumbs.ViewportHeight) jumps++;
-                last = now;
+                await Task.Delay(600);
+                _lines.Add($"  {how}: thumbnails turned back {reversals} times, jumped {jumps} times; page {viewer.CurrentPage + 1}'s thumbnail is {(ThumbnailShown(list, thumbs, viewer.CurrentPage) ? "in view" : "OUT OF VIEW")}");
+                if (reversals > 0) _lines.Add($"    page:offset {string.Join(" ", trail)}");
             }
+            await Follow("slowly", 60, 160);
+            await Follow("flicks", 400, 80);
+            viewer.SetZoom(0.35);
             await Task.Delay(600);
-            _lines.Add($"  thumbnails turned back {reversals} times, jumped {jumps} times; page {viewer.CurrentPage + 1}'s thumbnail is {(ThumbnailShown(list, thumbs, viewer.CurrentPage) ? "in view" : "OUT OF VIEW")}");
+            await Follow("zoomed out", 60, 160);
+            viewer.SetMode(Controls.ZoomMode.FitWidth);
+            await Task.Delay(400);
+
+            // Like a user: click a thumbnail (the list takes keyboard focus), then scroll the pages with a
+            // touchpad, whose small wheel steps arrive several per frame.
+            if (list.ItemContainerGenerator.ContainerFromIndex(viewer.CurrentPage) is UIElement clicked)
+            {
+                Click(clicked);
+                await Task.Delay(400);
+                int reversals = 0, direction = 0;
+                var last = thumbs.VerticalOffset;
+                var trail = new List<string>();
+                for (var i = 0; i < 160; i++)
+                {
+                    App.SimulateWheel(window, -40, 3);
+                    await Task.Delay(16);
+                    var now = thumbs.VerticalOffset;
+                    var moved = Math.Sign(Math.Round(now - last));
+                    if (moved != 0)
+                    {
+                        if (direction != 0 && moved != direction) reversals++;
+                        direction = moved;
+                    }
+                    if (trail.Count < 60) trail.Add($"{viewer.CurrentPage + 1}:{now:0}");
+                    last = now;
+                }
+                await Task.Delay(600);
+                _lines.Add($"  touchpad after a click: thumbnails turned back {reversals} times; page {viewer.CurrentPage + 1}'s thumbnail is {(ThumbnailShown(list, thumbs, viewer.CurrentPage) ? "in view" : "OUT OF VIEW")}");
+                if (reversals > 0) _lines.Add($"    page:offset {string.Join(" ", trail)}");
+            }
 
             // Picking a thumbnail far away goes to that page and keeps it picked.
             var target = Math.Min(viewer.PageCount - 1, viewer.CurrentPage + 37);
             list.SelectedItem = list.Items[target];
             await Task.Delay(600);
             _lines.Add($"  picked page {target + 1}: viewer shows page {viewer.CurrentPage + 1}, thumbnail {(ThumbnailShown(list, thumbs, target) ? "in view" : "OUT OF VIEW")}");
+        });
+        await Step("layouts, back and forward", async () =>
+        {
+            viewer.SetMode(Controls.ZoomMode.FitWidth);
+            viewer.GoToPage(0);
+            await Task.Delay(300);
+            // Far jumps can be gone back from; next and previous pages can't.
+            viewer.GoToPage(49);
+            await Task.Delay(300);
+            viewer.NextPage();
+            await Task.Delay(300);
+            var afterNext = viewer.CurrentPage + 1;
+            viewer.GoBack();
+            await Task.Delay(300);
+            var back = viewer.CurrentPage + 1;
+            viewer.GoForward();
+            await Task.Delay(300);
+            _lines.Add($"  went to 50, next {afterNext}; back to {back}, forward to {viewer.CurrentPage + 1}");
+
+            // Two pages turn together; a book's cover is alone.
+            viewer.Layout = Core.Rendering.PageLayout.Two;
+            viewer.GoToPage(10);
+            await Task.Delay(300);
+            viewer.NextPage();
+            await Task.Delay(300);
+            var two = viewer.CurrentPage + 1;
+            viewer.Layout = Core.Rendering.PageLayout.Book;
+            viewer.GoToPage(0);
+            await Task.Delay(300);
+            viewer.NextPage();
+            await Task.Delay(300);
+            var book = viewer.CurrentPage + 1;
+            viewer.NextPage();
+            await Task.Delay(300);
+            _lines.Add($"  two pages: next from 11 shows {two}; book: next from the cover {book}, then {viewer.CurrentPage + 1}; {viewer.Columns} side by side");
+
+            // Zooming out keeps the page in view and puts more beside it.
+            viewer.Layout = Core.Rendering.PageLayout.Auto;
+            viewer.SetMode(Controls.ZoomMode.FitWidth);
+            viewer.GoToPage(30);
+            await Task.Delay(300);
+            viewer.SetZoom(0.25);
+            await Task.Delay(500);
+            var zoomedOut = $"{viewer.CurrentPage + 1} with {viewer.Columns} side by side";
+            viewer.SetMode(Controls.ZoomMode.FitWidth);
+            await Task.Delay(500);
+            _lines.Add($"  zoomed out from 31: page {zoomedOut}; back to fit width: page {viewer.CurrentPage + 1}, {viewer.Columns} side by side");
         });
         await Step("jump to the end", async () =>
         {
@@ -184,10 +290,24 @@ internal sealed class StressRun(MainWindow window, string reportPath)
             await Task.Delay(1000);
             await view.CloseToolAsync();
         });
+        threads = ThreadTimes();
+        slowest.Clear();
+        window.Dispatcher.Hooks.OperationStarted += OnStarted;
+        window.Dispatcher.Hooks.OperationCompleted += OnCompleted;
         await Step("idle", () => Task.Delay(3000));
+        window.Dispatcher.Hooks.OperationStarted -= OnStarted;
+        window.Dispatcher.Hooks.OperationCompleted -= OnCompleted;
+        Threads("idle", threads);
+        _lines.Add("  slowest UI jobs: " + string.Join("; ", slowest.OrderByDescending(j => j.Ms).Take(5).Select(j => $"{j.Ms:0} ms {j.What}")));
         await Step("close the tab", () => workspace.CloseAsync(view.Session));
         await Step("idle after closing", () => Task.Delay(3000));
         File.WriteAllLines(reportPath, _lines);
+    }
+
+    private static void Click(UIElement target)
+    {
+        foreach (var e in new[] { UIElement.PreviewMouseLeftButtonDownEvent, UIElement.MouseLeftButtonDownEvent, UIElement.PreviewMouseLeftButtonUpEvent, UIElement.MouseLeftButtonUpEvent })
+            target.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left) { RoutedEvent = e });
     }
 
     private static bool ThumbnailShown(System.Windows.Controls.ListBox list, System.Windows.Controls.ScrollViewer thumbs, int page)

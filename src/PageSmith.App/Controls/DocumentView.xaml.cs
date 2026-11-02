@@ -18,6 +18,7 @@ using PageSmith.App.Tools;
 using PageSmith.App.Tools.Editor;
 using PageSmith.Core.Imaging;
 using PageSmith.Core.Pdf;
+using PageSmith.Core.Rendering;
 using PageSmith.Core.Text;
 using PageSmith.Core.Tools.Edit;
 using PageSmith.Core.Tools.Security;
@@ -37,9 +38,17 @@ public partial class DocumentView : UserControl
     private readonly List<PageThumbnail> _thumbQueue = [];
     private readonly Queue<PageThumbnail> _loadedThumbs = new();
     private readonly DispatcherTimer _findTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
+
+    /// <summary>While the pages scroll, the thumbnails catch up at most this often rather than at every page.</summary>
+    private readonly DispatcherTimer _thumbFollow = new() { Interval = TimeSpan.FromMilliseconds(120) };
+
     private ObservableCollection<PageThumbnail> _thumbs = [];
+    private PageThumbnail? _currentThumb;
     private int _version;
-    private bool _thumbPumping, _syncingThumbs, _updatingZoom, _hasOutline;
+    private bool _thumbPumping, _syncingThumbs, _updatingZoom, _hasOutline, _placed;
+
+    /// <summary>Whether the page box holds a number the user typed (only then does leaving it go there).</summary>
+    private bool _pageTyped, _showingPage;
     private string _panel = "";
     private IReadOnlyList<PageComment> _comments = [];
     private ToolController? _tool;
@@ -62,10 +71,21 @@ public partial class DocumentView : UserControl
         Viewer.NotePlaced += OnNotePlaced;
         session.VersionChanged += OnVersionChanged;
         _findTimer.Tick += (_, _) => RunFind();
+        _thumbFollow.Tick += (_, _) =>
+        {
+            _thumbFollow.Stop();
+            RevealCurrentThumb();
+        };
+        Viewer.Layout = AppServices.Settings.ReaderLayout;
         ShowToolList(null);
         ShowPanel(AppServices.Settings.ReaderPanel);
         ShowToolsPane(AppServices.Settings.ReaderToolsPane);
-        Loaded += (_, _) => Viewer.FocusView();
+        Loaded += (_, _) =>
+        {
+            Viewer.FocusView();
+            // Once laid out, reopen at the page the document was left at.
+            if (!_placed) Dispatcher.InvokeAsync(PlaceWhereLeft, DispatcherPriority.Background);
+        };
         RefreshParts();
         ShowZoom();
     }
@@ -80,14 +100,33 @@ public partial class DocumentView : UserControl
     /// <summary>Lets go of the document when its tab closes.</summary>
     public void Detach()
     {
+        RememberPlace();
         _session.VersionChanged -= OnVersionChanged;
         _findCts?.Cancel();
         _findTimer.Stop();
+        _thumbFollow.Stop();
         CloseTool();
         Viewer.Session = null;
     }
 
     public void FocusView() => Viewer.FocusView();
+
+    /// <summary>Keeps the page and zoom this document was left at, to reopen it there.</summary>
+    public void RememberPlace()
+    {
+        if (_session.FilePath is not { } path || Viewer.PageCount == 0) return;
+        AppServices.Settings.RememberPlace(new ReadingPlace(path, Viewer.CurrentPage, Viewer.Mode, Viewer.Zoom));
+    }
+
+    private void PlaceWhereLeft()
+    {
+        _placed = true;
+        // Snapshot runs show documents from the start, whatever the user last did with them.
+        if (AppServices.IsSnapshotRun || _session.FilePath is not { } path || AppServices.Settings.PlaceFor(path) is not { } place) return;
+        if (place.Mode == ZoomMode.Custom) Viewer.SetZoom(place.Zoom);
+        else if (place.Mode != Viewer.Mode) Viewer.SetMode(place.Mode);
+        if (place.Page > 0 && place.Page < Viewer.PageCount) Viewer.GoToPage(place.Page, remember: false);
+    }
 
     private void OnVersionChanged(object? sender, EventArgs e)
     {
@@ -101,7 +140,7 @@ public partial class DocumentView : UserControl
         _version++;
         BuildThumbnails();
         _ = LoadOutlineAsync(_version);
-        PageBox.Text = (Viewer.CurrentPage + 1).ToString(CultureInfo.CurrentCulture);
+        ShowPageNumber();
     }
 
     // ------------------------------------------------------------------ keyboard
@@ -112,6 +151,7 @@ public partial class DocumentView : UserControl
         if (_tool != null) return false;
         var ctrl = modifiers.HasFlag(ModifierKeys.Control);
         var shift = modifiers.HasFlag(ModifierKeys.Shift);
+        var alt = modifiers.HasFlag(ModifierKeys.Alt);
         var typing = Keyboard.FocusedElement is TextBoxBase;
         switch (key)
         {
@@ -130,6 +170,8 @@ public partial class DocumentView : UserControl
             case Key.D0 or Key.NumPad0 when ctrl: Viewer.SetMode(ZoomMode.FitPage); return true;
             case Key.D1 or Key.NumPad1 when ctrl: Viewer.SetZoom(1); return true;
             case Key.D2 or Key.NumPad2 when ctrl: Viewer.SetMode(ZoomMode.FitWidth); return true;
+            case Key.Left when alt: Viewer.GoBack(); return true;
+            case Key.Right when alt: Viewer.GoForward(); return true;
             case Key.Escape when FindBar.Visibility == Visibility.Visible && FindBox.IsKeyboardFocusWithin: CloseFind(); return true;
             default: return false;
         }
@@ -169,8 +211,21 @@ public partial class DocumentView : UserControl
 
     private void OnPageChanged()
     {
-        if (!PageBox.IsKeyboardFocusWithin) PageBox.Text = (Viewer.CurrentPage + 1).ToString(CultureInfo.CurrentCulture);
+        if (!_pageTyped) ShowPageNumber();
         SyncThumbSelection();
+    }
+
+    private void ShowPageNumber()
+    {
+        _showingPage = true;
+        PageBox.Text = (Viewer.CurrentPage + 1).ToString(CultureInfo.CurrentCulture);
+        _showingPage = false;
+        _pageTyped = false;
+    }
+
+    private void OnPageBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_showingPage) _pageTyped = true;
     }
 
     private void OnPageBoxFocus(object sender, KeyboardFocusChangedEventArgs e) => PageBox.SelectAll();
@@ -185,7 +240,7 @@ public partial class DocumentView : UserControl
         }
         else if (e.Key == Key.Escape)
         {
-            PageBox.Text = (Viewer.CurrentPage + 1).ToString(CultureInfo.CurrentCulture);
+            ShowPageNumber();
             Viewer.FocusView();
             e.Handled = true;
         }
@@ -193,11 +248,12 @@ public partial class DocumentView : UserControl
 
     private void OnPageBoxLostFocus(object sender, KeyboardFocusChangedEventArgs e) => GoToTypedPage();
 
+    /// <summary>Goes to the page typed in the page box. Leaving the box untouched goes nowhere: it may show an old page.</summary>
     private void GoToTypedPage()
     {
-        if (int.TryParse(PageBox.Text.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var page) && page >= 1 && page <= _session.PageCount)
+        if (_pageTyped && int.TryParse(PageBox.Text.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var page) && page >= 1 && page <= _session.PageCount)
             Viewer.GoToPage(page - 1);
-        PageBox.Text = (Viewer.CurrentPage + 1).ToString(CultureInfo.CurrentCulture);
+        ShowPageNumber();
     }
 
     private void OnZoomIn(object sender, RoutedEventArgs e) => Viewer.ZoomIn();
@@ -207,6 +263,26 @@ public partial class DocumentView : UserControl
     private void OnFitWidth(object sender, RoutedEventArgs e) => Viewer.SetMode(ZoomMode.FitWidth);
 
     private void OnFitPage(object sender, RoutedEventArgs e) => Viewer.SetMode(ZoomMode.FitPage);
+
+    private void OnLayoutButton(object sender, RoutedEventArgs e)
+    {
+        foreach (var item in LayoutMenu.Items.OfType<MenuItem>()) item.IsChecked = (string)item.Tag == Viewer.Layout.ToString();
+        LayoutMenu.PlacementTarget = LayoutButton;
+        LayoutMenu.Placement = PlacementMode.Bottom;
+        LayoutMenu.IsOpen = true;
+    }
+
+    private void OnLayoutPicked(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuItem)?.Tag is not string tag || !Enum.TryParse<PageLayout>(tag, out var layout)) return;
+        Viewer.Layout = layout;
+        AppServices.Settings.ReaderLayout = layout;
+        AppServices.SaveSettings();
+    }
+
+    private void OnBack(object sender, RoutedEventArgs e) => Viewer.GoBack();
+
+    private void OnForward(object sender, RoutedEventArgs e) => Viewer.GoForward();
 
     private void ShowZoom()
     {
@@ -281,7 +357,7 @@ public partial class DocumentView : UserControl
         CommentsToggle.IsChecked = _panel == "comments";
         SidePanel.Visibility = _panel.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdatePanelParts();
-        if (_panel == "pages") Dispatcher.InvokeAsync(SyncThumbSelection, DispatcherPriority.Loaded);
+        if (_panel == "pages") Dispatcher.InvokeAsync(RevealCurrentThumb, DispatcherPriority.Loaded);
     }
 
     private void UpdatePanelParts()
@@ -308,6 +384,7 @@ public partial class DocumentView : UserControl
             list.Add(new PageThumbnail(i, Math.Round(sizes[i].Width * k), Math.Round(sizes[i].Height * k)));
         }
         _thumbs = list;
+        _currentThumb = null;
         _syncingThumbs = true;
         Thumbs.ItemsSource = list;
         _syncingThumbs = false;
@@ -395,14 +472,68 @@ public partial class DocumentView : UserControl
         }
     }
 
+    /// <summary>
+    /// Outlines the current page's thumbnail and keeps it in view. A single selection follows the current page;
+    /// several selected pages (to rotate or delete, say) are left as they are.
+    /// </summary>
     private void SyncThumbSelection()
     {
         var page = Viewer.CurrentPage;
-        if (page < 0 || page >= _thumbs.Count || Thumbs.SelectedItems.Count > 1) return;
-        _syncingThumbs = true;
-        Thumbs.SelectedItem = _thumbs[page];
-        if (Thumbs.IsVisible) Thumbs.ScrollIntoView(_thumbs[page]);
-        _syncingThumbs = false;
+        if (page < 0 || page >= _thumbs.Count) return;
+        if (_currentThumb != null) _currentThumb.IsCurrent = false;
+        _currentThumb = _thumbs[page];
+        _currentThumb.IsCurrent = true;
+        if (Thumbs.SelectedItems.Count <= 1 && !ReferenceEquals(Thumbs.SelectedItem, _currentThumb))
+        {
+            _syncingThumbs = true;
+            Thumbs.SelectedItem = _currentThumb;
+            _syncingThumbs = false;
+        }
+        // Scrolling the list at every page of a fast scroll made it jump about; it catches up a moment later.
+        if (Thumbs.IsVisible && !_thumbFollow.IsEnabled) _thumbFollow.Start();
+    }
+
+    /// <summary>
+    /// Scrolls the current page's thumbnail to the middle of the list when it is out of view. Thumbnails all
+    /// take the same height, so where it is follows from any thumbnail in view, without laying the list out.
+    /// </summary>
+    private void RevealCurrentThumb()
+    {
+        var page = Viewer.CurrentPage;
+        if (!Thumbs.IsVisible || page < 0 || page >= _thumbs.Count || FindScrollViewer(Thumbs) is not { } scroll) return;
+        FrameworkElement? known = null;
+        var knownTop = 0.0;
+        if (FindItemsHost(Thumbs) is { } host)
+        {
+            foreach (var child in host.Children.OfType<FrameworkElement>())
+            {
+                var y = child.TranslatePoint(new Point(0, 0), scroll).Y;
+                if (y + child.ActualHeight < 0 || y > scroll.ViewportHeight) continue;
+                known = child;
+                knownTop = y;
+                break;
+            }
+        }
+        if (known == null || Thumbs.ItemContainerGenerator.IndexFromContainer(known) is var index && index < 0)
+        {
+            Thumbs.ScrollIntoView(_thumbs[page]);
+            return;
+        }
+        var slot = known.ActualHeight + known.Margin.Top + known.Margin.Bottom;
+        var top = knownTop + (page - index) * slot;
+        if (top >= 0 && top + known.ActualHeight <= scroll.ViewportHeight) return;
+        scroll.ScrollToVerticalOffset(scroll.VerticalOffset + top - (scroll.ViewportHeight - known.ActualHeight) / 2);
+    }
+
+    private static Panel? FindItemsHost(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is Panel { IsItemsHost: true } host) return host;
+            if (FindItemsHost(child) is { } deeper) return deeper;
+        }
+        return null;
     }
 
     private void OnThumbSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -475,9 +606,13 @@ public partial class DocumentView : UserControl
     private void OnThumbsMouseDown(object sender, MouseButtonEventArgs e) =>
         _thumbPress = ItemUnder(e.OriginalSource) != null ? e.GetPosition(Thumbs) : null;
 
+    private void OnThumbsMouseUp(object sender, MouseButtonEventArgs e) => _thumbPress = null;
+
     private void OnThumbsMouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed || _thumbPress is not { } start) return;
+        // A press that ended elsewhere (the button let go outside the list) must not start a drag later.
+        if (e.LeftButton != MouseButtonState.Pressed) _thumbPress = null;
+        if (_thumbPress is not { } start) return;
         var moved = e.GetPosition(Thumbs) - start;
         if (Math.Abs(moved.X) < SystemParameters.MinimumHorizontalDragDistance * 2 && Math.Abs(moved.Y) < SystemParameters.MinimumVerticalDragDistance * 2) return;
         _thumbPress = null;
@@ -710,6 +845,8 @@ public partial class DocumentView : UserControl
         var selected = Viewer.HasSelection;
         foreach (var item in new[] { CopyItem, HighlightItem, UnderlineItem, StrikeItem, RedactSelectionItem }) item.IsEnabled = selected;
         AddNoteItem.IsEnabled = Viewer.ContextPoint != null;
+        BackItem.IsEnabled = Viewer.CanGoBack;
+        ForwardItem.IsEnabled = Viewer.CanGoForward;
     }
 
     private async void OnCopy(object sender, RoutedEventArgs e) => await Viewer.CopySelectionAsync();
@@ -736,7 +873,7 @@ public partial class DocumentView : UserControl
         var marks = Viewer.GetSelectionBoxes().SelectMany(p => p.Boxes.Select(b => new RedactionMark(p.Page, b))).ToList();
         if (marks.Count == 0) return;
         if (!await AppServices.ConfirmAsync("Redact the selected text?",
-                "The text is removed for good and the pages it is on are rebuilt as images with searchable text. You can still undo it before saving.",
+                "The text is removed for good; its pages become images with searchable text. You can undo before saving.",
                 "Redact")) return;
         await PageActions.RedactAsync(_session, marks);
     }
@@ -1126,6 +1263,9 @@ public sealed partial class PageThumbnail(int index, double width, double height
     public bool Requested { get; set; }
 
     [ObservableProperty] public partial BitmapSource? Image { get; set; }
+
+    /// <summary>The page in view in the reader.</summary>
+    [ObservableProperty] public partial bool IsCurrent { get; set; }
 }
 
 /// <summary>A category of tools in the All tools pane.</summary>

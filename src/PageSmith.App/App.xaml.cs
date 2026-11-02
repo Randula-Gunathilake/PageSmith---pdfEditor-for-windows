@@ -33,6 +33,7 @@ public partial class App : Application
 
         PdfDocs.EnsureInitialized();
         WheelScrolling.Register();
+        if (!AppServices.IsSnapshotRun) UpdatePdfRegistration();
         DispatcherUnhandledException += OnUnhandled;
         TaskScheduler.UnobservedTaskException += (_, unobserved) =>
         {
@@ -80,6 +81,19 @@ public partial class App : Application
         }, DispatcherPriority.ApplicationIdle);
     }
 
+    /// <summary>If PDFs are registered to open with this copy, adds what newer versions register (the right-click command).</summary>
+    private static void UpdatePdfRegistration()
+    {
+        try
+        {
+            if (Environment.ProcessPath is { } exe) PdfAppRegistration.Update(exe);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+        {
+            AppServices.LogError(ex);
+        }
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         _instance?.Dispose();
@@ -114,8 +128,16 @@ public partial class App : Application
         await Task.Delay(args.DelayMs);
         if (window.ActiveView is { } reader)
         {
-            // Reader checks: go to a page, select text, search, or open a tool on the document.
+            // Reader checks: lay out and zoom, go to a page, select text, search, or open a tool on the document.
+            if (args.Layout != null && Enum.TryParse<Core.Rendering.PageLayout>(args.Layout, true, out var layout)) reader.PageView.Layout = layout;
+            switch (args.Zoom)
+            {
+                case "width": reader.PageView.SetMode(Controls.ZoomMode.FitWidth); break;
+                case "page": reader.PageView.SetMode(Controls.ZoomMode.FitPage); break;
+                case { } percent when double.TryParse(percent, NumberStyles.Float, CultureInfo.InvariantCulture, out var z): reader.PageView.SetZoom(z / 100); break;
+            }
             if (args.GoTo > 0) reader.PageView.GoToPage(args.GoTo - 1);
+            if (args.Layout != null || args.Zoom != null || args.GoTo > 0) await Task.Delay(1200);
             if (args.SelectAll) reader.PageView.SelectAll();
             if (args.Drag is { Length: 4 } drag)
             {
@@ -178,7 +200,7 @@ public partial class App : Application
     /// Development aid: a burst of wheel events over the middle of the window, raised on the element there
     /// like real ones. A touchpad sends many small deltas before the next layout pass.
     /// </summary>
-    private static void SimulateWheel(MainWindow window, int delta, int count)
+    internal static void SimulateWheel(MainWindow window, int delta, int count)
     {
         var root = (FrameworkElement)window.Content;
         if (root.InputHitTest(new Point(root.ActualWidth * 0.5, root.ActualHeight * 0.6)) is not UIElement target) return;
@@ -249,6 +271,12 @@ public sealed class CommandLine
     /// <summary>A burst of wheel events in the reader, "delta,count" (a touchpad sends many small ones).</summary>
     public double[]? Wheel { get; private set; }
 
+    /// <summary>For reader snapshots: a zoom percentage, "width" or "page".</summary>
+    public string? Zoom { get; private set; }
+
+    /// <summary>For reader snapshots: auto, single, two or book.</summary>
+    public string? Layout { get; private set; }
+
     public static CommandLine Parse(string[] args)
     {
         var c = new CommandLine();
@@ -277,6 +305,8 @@ public sealed class CommandLine
                 case "--highlight": c.Highlight = Next(); break;
                 case "--note": c.Note = Next(); break;
                 case "--stress": c.StressReport = Next(); break;
+                case "--zoom": c.Zoom = Next(); break;
+                case "--layout": c.Layout = Next(); break;
                 case "--wheel": c.Wheel = Next().Split(',').Select(v => double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0).ToArray(); break;
                 default:
                     if (File.Exists(args[i])) c.Files.Add(Path.GetFullPath(args[i]));
