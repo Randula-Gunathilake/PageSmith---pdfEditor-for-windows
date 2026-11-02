@@ -103,7 +103,7 @@
                 <ui:ProgressRing
                     Width="18"
                     Height="18"
-                    IsIndeterminate="True" />
+                    IsIndeterminate="{Binding IsComparing}" />
                 <TextBlock
                     Margin="8,0,0,0"
                     VerticalAlignment="Center"

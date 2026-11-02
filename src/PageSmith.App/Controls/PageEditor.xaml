@@ -386,7 +386,7 @@
                 Grid.Column="1"
                 Width="36"
                 Height="36"
-                IsIndeterminate="True"
+                IsIndeterminate="False"
                 Visibility="Collapsed" />
 
             <!--  Zoom and page navigation, floating over the page  -->

@@ -69,6 +69,11 @@ public partial class App : Application
         window.Dispatcher.InvokeAsync(async () =>
         {
             await Task.Delay(300);
+            if (args.StressReport != null)
+            {
+                await new StressRun(window, args.StressReport).RunAsync(args.Files);
+                Environment.Exit(0);
+            }
             if (args.Page != null) OpenPage(args.Page, args.Files);
             else if (args.Files.Count > 0) await AppServices.Documents.OpenAsync(args.Files);
             if (args.Snapshot != null) await SnapshotAsync(window, args);
@@ -238,6 +243,9 @@ public sealed class CommandLine
     /// <summary>Adds a note with this text near the top of the first page.</summary>
     public string? Note { get; private set; }
 
+    /// <summary>Runs the reader stress test (with --snapshot) and writes its report to this file.</summary>
+    public string? StressReport { get; private set; }
+
     /// <summary>A burst of wheel events in the reader, "delta,count" (a touchpad sends many small ones).</summary>
     public double[]? Wheel { get; private set; }
 
@@ -268,6 +276,7 @@ public sealed class CommandLine
                 case "--properties": c.Properties = true; break;
                 case "--highlight": c.Highlight = Next(); break;
                 case "--note": c.Note = Next(); break;
+                case "--stress": c.StressReport = Next(); break;
                 case "--wheel": c.Wheel = Next().Split(',').Select(v => double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0).ToArray(); break;
                 default:
                     if (File.Exists(args[i])) c.Files.Add(Path.GetFullPath(args[i]));

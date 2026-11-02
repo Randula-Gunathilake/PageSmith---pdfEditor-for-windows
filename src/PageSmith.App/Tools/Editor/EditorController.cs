@@ -266,7 +266,8 @@ public abstract partial class EditorController : ToolController
         {
             var bitmap = await Task.Run(() => renderer.RenderAsync(index, key.Item2));
             if (!ReferenceEquals(renderer, _renderer)) return null;
-            if (_renders.Count > 12) _renders.Clear();
+            // A few pages at the current zoom: full-page renders are large.
+            if (_renders.Count >= 4) _renders.Clear();
             _renders[key] = bitmap;
             return bitmap;
         }

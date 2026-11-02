@@ -237,6 +237,7 @@ public sealed partial class DocumentWorkspace : ObservableObject
         if (ReferenceEquals(Active, session))
             Active = Documents.Count == 0 ? null : Documents[Math.Clamp(index, 0, Documents.Count - 1)];
         session.Dispose();
+        AppServices.TrimMemory();
         return true;
     }
 

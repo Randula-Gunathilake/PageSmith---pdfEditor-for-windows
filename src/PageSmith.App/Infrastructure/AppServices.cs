@@ -219,6 +219,19 @@ public static class AppServices
         }
     }
 
+    /// <summary>
+    /// Gives memory back to Windows after big work (closing a document, a tool finishing): page images and
+    /// file buffers live in the large-object heap, which .NET otherwise compacts only rarely. Runs when the
+    /// app is idle; the pause is a fraction of a second.
+    /// </summary>
+    public static void TrimMemory() =>
+        Window?.Dispatcher.InvokeAsync(() =>
+        {
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+        }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
     public static string LogFile => Path.Combine(AppSettings.Folder, "pagesmith.log");
 
     public static void LogError(Exception ex)

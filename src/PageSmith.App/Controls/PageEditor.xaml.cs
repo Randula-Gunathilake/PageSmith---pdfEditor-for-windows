@@ -184,11 +184,18 @@ public partial class PageEditor : UserControl
         var version = ++_renderVersion;
         var dpiScale = VisualTreeHelper.GetDpi(this).DpiScaleX;
         var dpi = Math.Clamp(72 * _scale * dpiScale, 36, 400);
-        if (PageImage.Source == null) Loading.Visibility = Visibility.Visible;
+        if (PageImage.Source == null) ShowLoading(true);
         var bitmap = await C.RenderPageAsync(page.Index, dpi);
         if (version != _renderVersion || C.CurrentPage != page) return;
-        Loading.Visibility = Visibility.Collapsed;
+        ShowLoading(false);
         if (bitmap != null) PageImage.Source = bitmap;
+    }
+
+    /// <summary>The spinner animates only while shown: a hidden spinning ring still redraws the window.</summary>
+    private void ShowLoading(bool show)
+    {
+        Loading.IsIndeterminate = show;
+        Loading.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void Zoom(double factor)

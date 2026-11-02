@@ -2,6 +2,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Windows.Media.Imaging;
 using Windows.Data.Pdf;
 using Windows.Storage.Streams;
+using WinBitmapEncoder = Windows.Graphics.Imaging.BitmapEncoder;
 using WinPdfDocument = Windows.Data.Pdf.PdfDocument;
 
 namespace PageSmith.Core.Rendering;
@@ -26,10 +27,33 @@ public sealed class PdfRenderer : IDisposable
     public int PageCount => (int)_doc.PageCount;
     public bool IsPasswordProtected => _doc.IsPasswordProtected;
 
+    /// <summary>
+    /// Opens a PDF file. It is copied into native memory in chunks (no large managed buffer, and the file is
+    /// not kept open), which loads and renders several times faster than reading the file through a stream adapter.
+    /// </summary>
     public static async Task<PdfRenderer> OpenAsync(string path, string? password = null, CancellationToken ct = default)
     {
-        var bytes = await File.ReadAllBytesAsync(path, ct).ConfigureAwait(false);
-        return await OpenAsync(bytes, path, password).ConfigureAwait(false);
+        var stream = new InMemoryRandomAccessStream();
+        try
+        {
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1 << 16, FileOptions.SequentialScan);
+            var buffer = new byte[1 << 20];
+            int read;
+            while ((read = await file.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                await stream.WriteAsync(buffer.AsBuffer(0, read)).AsTask(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            stream.Dispose();
+            throw new UserFacingException($"\"{Path.GetFileName(path)}\" couldn't be read ({ex.Message}).", ex);
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
+        stream.Seek(0);
+        return await LoadAsync(stream, path, password).ConfigureAwait(false);
     }
 
     public static async Task<PdfRenderer> OpenAsync(byte[] pdf, string displayName, string? password = null)
@@ -37,6 +61,11 @@ public sealed class PdfRenderer : IDisposable
         var stream = new InMemoryRandomAccessStream();
         await stream.WriteAsync(pdf.AsBuffer());
         stream.Seek(0);
+        return await LoadAsync(stream, displayName, password).ConfigureAwait(false);
+    }
+
+    private static async Task<PdfRenderer> LoadAsync(IRandomAccessStream stream, string displayName, string? password)
+    {
         try
         {
             var doc = string.IsNullOrEmpty(password)
@@ -64,12 +93,27 @@ public sealed class PdfRenderer : IDisposable
         return new System.Windows.Size(page.Size.Width * 72.0 / 96.0, page.Size.Height * 72.0 / 96.0);
     }
 
+    /// <summary>Every page's size in points, as displayed.</summary>
+    public System.Windows.Size[] GetPageSizes()
+    {
+        var sizes = new System.Windows.Size[PageCount];
+        for (var i = 0; i < sizes.Length; i++) sizes[i] = GetPageSize(i);
+        return sizes;
+    }
+
     // Windows.Data.Pdf multiplies the destination size by the display scale of the process.
     // The factor is measured on the first render and divided out so output sizes are exact.
     private static double _displayScale;
 
     /// <summary>Renders a page to PNG bytes at the given resolution.</summary>
-    public async Task<byte[]> RenderPngAsync(int index, double dpi, bool whiteBackground = true, CancellationToken ct = default)
+    public Task<byte[]> RenderPngAsync(int index, double dpi, bool whiteBackground = true, CancellationToken ct = default) =>
+        RenderBytesAsync(index, dpi, whiteBackground, null, ct);
+
+    /// <summary>
+    /// Renders a page to encoded image bytes: PNG, or with <paramref name="encoder"/> another format. Pages
+    /// shown on screen use BMP, which skips compression and renders about a third faster.
+    /// </summary>
+    private async Task<byte[]> RenderBytesAsync(int index, double dpi, bool whiteBackground, Guid? encoder, CancellationToken ct)
     {
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -80,12 +124,12 @@ public sealed class PdfRenderer : IDisposable
             var wantedHeight = Math.Max(1, Math.Round(page.Size.Height * dpi / 96.0));
             var known = _displayScale > 0;
             var factor = known ? _displayScale : 1.0;
-            var bytes = await RenderAsync(page, wanted / factor, wantedHeight / factor, whiteBackground).ConfigureAwait(false);
-            var actual = PngWidth(bytes);
+            var bytes = await RenderAsync(page, wanted / factor, wantedHeight / factor, whiteBackground, encoder).ConfigureAwait(false);
+            var actual = ImageWidth(bytes);
             if (actual > 0 && Math.Abs(actual - wanted) > 1)
             {
                 _displayScale = actual / (wanted / factor);
-                bytes = await RenderAsync(page, wanted / _displayScale, wantedHeight / _displayScale, whiteBackground).ConfigureAwait(false);
+                bytes = await RenderAsync(page, wanted / _displayScale, wantedHeight / _displayScale, whiteBackground, encoder).ConfigureAwait(false);
             }
             else if (!known && actual > 0)
             {
@@ -99,7 +143,7 @@ public sealed class PdfRenderer : IDisposable
         }
     }
 
-    private static async Task<byte[]> RenderAsync(PdfPage page, double width, double height, bool whiteBackground)
+    private static async Task<byte[]> RenderAsync(PdfPage page, double width, double height, bool whiteBackground, Guid? encoder)
     {
         var options = new PdfPageRenderOptions
         {
@@ -107,6 +151,7 @@ public sealed class PdfRenderer : IDisposable
             DestinationHeight = (uint)Math.Max(1, Math.Round(height)),
             BackgroundColor = whiteBackground ? Windows.UI.Color.FromArgb(255, 255, 255, 255) : Windows.UI.Color.FromArgb(0, 255, 255, 255),
         };
+        if (encoder is { } id) options.BitmapEncoderId = id;
         using var output = new InMemoryRandomAccessStream();
         await page.RenderToStreamAsync(output, options);
         var bytes = new byte[output.Size];
@@ -115,25 +160,35 @@ public sealed class PdfRenderer : IDisposable
         return bytes;
     }
 
-    private static int PngWidth(byte[] png) =>
-        png.Length > 24 && png[1] == 'P' && png[2] == 'N' && png[3] == 'G'
-            ? png[16] << 24 | png[17] << 16 | png[18] << 8 | png[19]
-            : 0;
-
-    /// <summary>Renders a page so that its longer side is <paramref name="maxPixels"/> pixels.</summary>
-    public Task<byte[]> RenderThumbnailPngAsync(int index, int maxPixels, CancellationToken ct = default)
+    /// <summary>Pixel width from a PNG or BMP header; 0 when unknown.</summary>
+    private static int ImageWidth(byte[] image)
     {
-        var size = GetPageSize(index);
-        var longest = Math.Max(size.Width, size.Height);
-        var dpi = maxPixels * 72.0 / Math.Max(1, longest);
-        return RenderPngAsync(index, dpi, true, ct);
+        if (image.Length > 24 && image[1] == 'P' && image[2] == 'N' && image[3] == 'G')
+            return image[16] << 24 | image[17] << 16 | image[18] << 8 | image[19];
+        if (image.Length > 26 && image[0] == 'B' && image[1] == 'M')
+            return Math.Abs(BitConverter.ToInt32(image, 18));
+        return 0;
     }
 
-    /// <summary>Renders a page to a frozen WPF bitmap.</summary>
+    private double ThumbnailDpi(int index, int maxPixels)
+    {
+        var size = GetPageSize(index);
+        return maxPixels * 72.0 / Math.Max(1, Math.Max(size.Width, size.Height));
+    }
+
+    /// <summary>Renders a page so that its longer side is <paramref name="maxPixels"/> pixels.</summary>
+    public Task<byte[]> RenderThumbnailPngAsync(int index, int maxPixels, CancellationToken ct = default) =>
+        RenderPngAsync(index, ThumbnailDpi(index, maxPixels), true, ct);
+
+    /// <summary>Renders a thumbnail to a frozen WPF bitmap, its longer side <paramref name="maxPixels"/> pixels.</summary>
+    public Task<BitmapSource> RenderThumbnailAsync(int index, int maxPixels, CancellationToken ct = default) =>
+        RenderAsync(index, ThumbnailDpi(index, maxPixels), ct);
+
+    /// <summary>Renders a page, on white, to a frozen WPF bitmap for the screen.</summary>
     public async Task<BitmapSource> RenderAsync(int index, double dpi, CancellationToken ct = default)
     {
-        var png = await RenderPngAsync(index, dpi, true, ct).ConfigureAwait(false);
-        return Imaging.ImageIO.Decode(png);
+        var bmp = await RenderBytesAsync(index, dpi, true, WinBitmapEncoder.BmpEncoderId, ct).ConfigureAwait(false);
+        return Imaging.ImageIO.Decode(bmp);
     }
 
     /// <summary>
