@@ -197,6 +197,7 @@
                             KeyDown="OnPageBoxKey"
                             LostKeyboardFocus="OnPageBoxLostFocus"
                             Text="1"
+                            TextChanged="OnPageBoxTextChanged"
                             TextAlignment="Center"
                             ToolTip="Go to page (Ctrl+G)" />
                         <TextBlock
@@ -265,6 +266,37 @@
                             ToolTip="Fit page (Ctrl+0)">
                             <ui:SymbolIcon FontSize="18" Symbol="PageFit24" />
                         </ToggleButton>
+                        <ui:Button
+                            x:Name="LayoutButton"
+                            Click="OnLayoutButton"
+                            Style="{StaticResource BarButton}"
+                            ToolTip="Page layout">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="Grid24" />
+                            </ui:Button.Icon>
+                            <ui:Button.ContextMenu>
+                                <ContextMenu x:Name="LayoutMenu">
+                                    <MenuItem
+                                        Click="OnLayoutPicked"
+                                        Header="Automatic"
+                                        Tag="Auto"
+                                        ToolTip="More pages side by side as you zoom out" />
+                                    <MenuItem
+                                        Click="OnLayoutPicked"
+                                        Header="One page"
+                                        Tag="Single" />
+                                    <MenuItem
+                                        Click="OnLayoutPicked"
+                                        Header="Two pages"
+                                        Tag="Two" />
+                                    <MenuItem
+                                        Click="OnLayoutPicked"
+                                        Header="Book"
+                                        Tag="Book"
+                                        ToolTip="Two pages, with the cover on its own" />
+                                </ContextMenu>
+                            </ui:Button.ContextMenu>
+                        </ui:Button>
                         <Border Style="{StaticResource BarSeparator}" />
                         <ToggleButton
                             x:Name="SelectToggle"
@@ -488,6 +520,7 @@
                             Drop="OnThumbsDrop"
                             KeyDown="OnThumbsKey"
                             PreviewMouseLeftButtonDown="OnThumbsMouseDown"
+                            PreviewMouseLeftButtonUp="OnThumbsMouseUp"
                             PreviewMouseMove="OnThumbsMouseMove"
                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                             SelectionChanged="OnThumbSelectionChanged"
@@ -536,7 +569,7 @@
                                 </ContextMenu>
                             </ListBox.ContextMenu>
                             <ListBox.ItemContainerStyle>
-                                <!--  The page in view is outlined in the accent colour, like a reader's thumbnails.  -->
+                                <!--  The page in view is outlined in the accent colour; selected pages are filled.  -->
                                 <Style TargetType="ListBoxItem">
                                     <Setter Property="Padding" Value="6,8,6,4" />
                                     <Setter Property="Margin" Value="10,2" />
@@ -560,8 +593,10 @@
                                                     </Trigger>
                                                     <Trigger Property="IsSelected" Value="True">
                                                         <Setter TargetName="Box" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
-                                                        <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
                                                     </Trigger>
+                                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                        <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                    </DataTrigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
                                         </Setter.Value>
@@ -570,16 +605,20 @@
                             </ListBox.ItemContainerStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="{x:Type controls:PageThumbnail}">
+                                    <!--  Every thumbnail takes the same height, so where each one is in the list is known.  -->
                                     <StackPanel DataContextChanged="OnThumbDataChanged" Loaded="OnThumbLoaded">
-                                        <Border
-                                            Width="{Binding Width}"
-                                            Height="{Binding Height}"
-                                            HorizontalAlignment="Center"
-                                            Background="White"
-                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                                            BorderThickness="1">
-                                            <Image Source="{Binding Image}" Stretch="Uniform" />
-                                        </Border>
+                                        <Grid Height="170">
+                                            <Border
+                                                Width="{Binding Width}"
+                                                Height="{Binding Height}"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Background="White"
+                                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                                BorderThickness="1">
+                                                <Image Source="{Binding Image}" Stretch="Uniform" />
+                                            </Border>
+                                        </Grid>
                                         <TextBlock
                                             Margin="0,6,0,0"
                                             HorizontalAlignment="Center"
@@ -716,7 +755,7 @@
                             Grid.Row="1"
                             Margin="16,4,16,0"
                             Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                            Text="No comments yet. Select text to highlight it, or use the note tool to add a note."
+                            Text="No comments yet."
                             TextWrapping="Wrap"
                             Visibility="Collapsed" />
                     </Grid>
@@ -778,6 +817,25 @@
                                 Header="Add a note here">
                                 <MenuItem.Icon>
                                     <ui:SymbolIcon Symbol="NoteAdd24" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem
+                                x:Name="BackItem"
+                                Click="OnBack"
+                                Header="Back"
+                                InputGestureText="Alt+Left">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="ArrowLeft24" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem
+                                x:Name="ForwardItem"
+                                Click="OnForward"
+                                Header="Forward"
+                                InputGestureText="Alt+Right">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="ArrowRight24" />
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />

@@ -81,7 +81,7 @@ public sealed partial class SplitController() : ToolController("split")
         "Pages" when ExtractAll => PageCount > 0 ? $"Every page becomes its own PDF: {PageCount} PDFs will be created." : "Every page becomes its own PDF.",
         "Pages" => MergeExtracted ? "The selected pages will be merged into one PDF." : "Each selected page becomes its own PDF.",
         "Size" => PageCount > 0 ? $"Files will be no larger than {MaxSize:0.#} {(SizeInMegabytes ? "MB" : "KB")} each." : "Choose the maximum size of each file.",
-        _ => "PageSmith looks for bookmarks or blank separator pages and splits there — handy for batches of scanned documents.",
+        _ => "Splits at bookmarks or blank separator pages, handy for scanned batches.",
     };
 
     partial void OnTabChanged(string value) => OnPropertyChanged(nameof(Explanation));
@@ -218,7 +218,7 @@ public sealed partial class OcrController() : ToolController("ocr")
     private static void AddLanguages() => AppServices.OpenUri("ms-settings:regionlanguage");
 
     public override string? Validate() => !HasLanguages
-        ? "No OCR language is installed in Windows. Use \"Add languages\" to install one (Settings › Time & language › Language & region)."
+        ? "No OCR language is installed. Use \"Add languages\" to install one."
         : base.Validate();
 
     protected override async Task<ToolResult> RunCoreAsync(IProgress<ToolProgress> progress, CancellationToken ct)
@@ -276,7 +276,7 @@ public sealed partial class OfficeToPdfController(string id) : ToolController(id
             {
                 OfficeDetection.IsMicrosoftOfficeAppInstalled(app) ? $"Microsoft {app} is installed (best fidelity)." : $"Microsoft {app} was not found.",
                 Core.Office.LibreOffice.IsInstalled ? "LibreOffice is installed." : "LibreOffice was not found.",
-                "The built-in converter handles .docx, .xlsx, .pptx, .csv and .txt without any office suite.",
+                "The built-in converter handles .docx, .xlsx, .pptx, .csv and .txt without Office.",
             };
             return string.Join(" ", parts);
         }
@@ -605,8 +605,8 @@ public sealed partial class SummarizeController() : ToolController("summarize")
     public bool UsesAi => Provider != null;
 
     public string ServiceNote => Provider is { } p
-        ? $"{AiService.Describe(p)} writes the summary in its own words. The document's text is sent to {AiService.Company(p)} with your API key, so this needs the internet."
-        : "Picks the key sentences and keywords on this PC. Your document never leaves your computer.";
+        ? $"{AiService.Describe(p)} writes the summary in its own words. Needs the internet; the text is sent to {AiService.Company(p)}."
+        : "Picks the key sentences and keywords on this PC. Nothing leaves your computer.";
 
     /// <summary>An AI service is picked but has no API key yet.</summary>
     public bool NeedsKey => Provider is { } p && !AiService.HasKey(AppServices.Settings.KeyFor(p));

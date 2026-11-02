@@ -23,7 +23,7 @@ public sealed partial class PatternChoice(RedactionPattern pattern) : Observable
 public sealed partial class RedactController() : EditorController("redact")
 {
     private static readonly EditorTool SelectTool = new("select", "Select", SymbolRegular.Cursor24, PointerAction.Select,
-        "Click a mark to select it; drag to move, use the handles to resize, press Delete to remove it.");
+        "Click a mark to select it, drag to move, Delete to remove.");
     private static readonly EditorTool AreaTool = new("area", "Mark an area", SymbolRegular.RectangleLandscape24, PointerAction.DrawRect,
         "Drag over anything (text, pictures, signatures) to black it out.");
     private static readonly EditorTool WordTool = new("word", "Mark a word", SymbolRegular.TextT24, PointerAction.Pick,

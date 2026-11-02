@@ -52,7 +52,7 @@
                     Margin="0,6,0,0"
                     FontSize="12"
                     Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                    Text="Web pages need the internet. To convert a saved page offline, add its HTML file below instead." />
+                    Text="Web pages need the internet. Offline, add a saved HTML file instead." />
             </StackPanel>
         </Border>
 
@@ -99,7 +99,7 @@
             <ui:ProgressRing
                 Width="22"
                 Height="22"
-                IsIndeterminate="True" />
+                IsIndeterminate="{Binding IsPreviewing}" />
             <TextBlock
                 Margin="10,0,0,0"
                 VerticalAlignment="Center"

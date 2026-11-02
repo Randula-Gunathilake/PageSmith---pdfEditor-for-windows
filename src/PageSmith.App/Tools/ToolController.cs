@@ -222,6 +222,8 @@ public abstract partial class ToolController : ObservableObject
             IsBusy = false;
             _cts.Dispose();
             _cts = null;
+            // Tools work with whole documents in memory; hand that back once they're done.
+            AppServices.TrimMemory();
         }
     }
 

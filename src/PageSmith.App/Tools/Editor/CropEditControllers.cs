@@ -18,7 +18,7 @@ namespace PageSmith.App.Tools;
 public sealed partial class CropController() : EditorController("crop")
 {
     private static readonly EditorTool Adjust = new("crop", "Adjust the crop area", SymbolRegular.Crop24, PointerAction.Select,
-        "Drag the frame or its handles to choose what to keep. Everything outside the frame is cut away.");
+        "Drag the frame or its handles. Everything outside is cut away.");
 
     private CropItem? _crop;
     private Rect _fraction = new(0.05, 0.05, 0.9, 0.9);
@@ -127,10 +127,10 @@ public sealed partial class CropController() : EditorController("crop")
 public sealed partial class EditController() : EditorController("edit")
 {
     private static readonly EditorTool SelectTool = new("select", "Select", SymbolRegular.Cursor24, PointerAction.Select,
-        "Click an item to select it; drag to move, use the handles to resize. Double-click text to edit it.");
+        "Click to select, drag to move, use the handles to resize. Double-click text to edit.");
     private static readonly EditorTool TextTool = new("text", "Add text", SymbolRegular.TextAddT24, PointerAction.Click, "Click where the text should go, then type.");
     private static readonly EditorTool EditTextTool = new("edit-text", "Edit existing text", SymbolRegular.TextEditStyle24, PointerAction.Pick,
-        "Click a line of the document's text to replace it. The old text is covered and your new text is written on top.");
+        "Click a line of text to replace it.");
     private static readonly EditorTool ImageTool = new("image", "Add image", SymbolRegular.ImageAdd24, PointerAction.Click, "Click where the image should go and choose a picture.");
     private static readonly EditorTool RectTool = new("rect", "Rectangle", SymbolRegular.RectangleLandscape24, PointerAction.DrawRect, "Drag on the page to draw a rectangle.");
     private static readonly EditorTool EllipseTool = new("ellipse", "Ellipse", SymbolRegular.Oval24, PointerAction.DrawRect, "Drag on the page to draw an ellipse.");
@@ -272,7 +272,7 @@ public sealed partial class EditController() : EditorController("edit")
         var line = lines.Where(l => Inflate(l.Bounds, 2).Contains(point)).OrderBy(l => l.Bounds.Width * l.Bounds.Height).FirstOrDefault();
         if (line == null)
         {
-            AppServices.Notify("No text there", "Click directly on a line of text. Scanned pages have no editable text; run OCR PDF first, or use Add text and White-out.");
+            AppServices.Notify("No text there", "Click on a line of text. Scanned pages need OCR PDF first, or use Add text and White-out.");
             return;
         }
         var covered = ItemsOn(page).OfType<TextItem>().FirstOrDefault(t => t.Background != null && t.Bounds.IntersectsWith(line.Bounds));

@@ -5,8 +5,9 @@ namespace PageSmith.Core.Common;
 
 /// <summary>
 /// Registers PageSmith with Windows as a PDF app for the current user, without admin rights. It then
-/// appears in "Open with" and in Settings › Apps › Default apps, where the user can make it the default:
-/// Windows doesn't let apps make themselves the default, so that last step is the user's.
+/// appears in "Open with", as "Open with PageSmith" when a PDF is right-clicked, and in Settings › Apps ›
+/// Default apps, where the user can make it the default: Windows doesn't let apps make themselves the
+/// default, so that last step is the user's.
 /// </summary>
 public static class PdfAppRegistration
 {
@@ -17,6 +18,9 @@ public static class PdfAppRegistration
     internal static string Root { get; set; } = "Software";
 
     private static string Classes => $@"{Root}\Classes";
+
+    /// <summary>The right-click command on PDFs, whatever app opens them (on Windows 11, under "Show more options").</summary>
+    private static string ContextVerb => $@"{Classes}\SystemFileAssociations\.pdf\shell\{AppName}";
     private static string Capabilities => $@"{Root}\{AppName}\Capabilities";
 
     public static string Command(string exe) => $"\"{exe}\" \"%1\"";
@@ -59,7 +63,27 @@ public static class PdfAppRegistration
             key.SetValue(".pdf", ProgId);
         }
         using (var key = Registry.CurrentUser.CreateSubKey($@"{Root}\RegisteredApplications")) key.SetValue(AppName, Capabilities);
+        using (var verb = Registry.CurrentUser.CreateSubKey(ContextVerb))
+        {
+            verb.SetValue("MUIVerb", $"Open with {AppName}");
+            verb.SetValue("Icon", icon);
+            using var key = verb.CreateSubKey("command");
+            key.SetValue("", Command(exe));
+        }
         NotifyShell();
+    }
+
+    /// <summary>
+    /// Brings this copy's registration up to date when it is registered already: newer versions register
+    /// more (the right-click command). Copies that aren't registered are left alone.
+    /// </summary>
+    public static bool Update(string exe)
+    {
+        if (!IsRegistered(exe)) return false;
+        using (var command = Registry.CurrentUser.OpenSubKey($@"{ContextVerb}\command"))
+            if (string.Equals(command?.GetValue("") as string, Command(exe), StringComparison.OrdinalIgnoreCase)) return false;
+        Register(exe);
+        return true;
     }
 
     public static void Unregister(string exe)
@@ -73,6 +97,7 @@ public static class PdfAppRegistration
             if (app is { SubKeyCount: 0, ValueCount: 0 }) Registry.CurrentUser.DeleteSubKey($@"{Root}\{AppName}", throwOnMissingSubKey: false);
         }
         using (var key = Registry.CurrentUser.OpenSubKey($@"{Root}\RegisteredApplications", writable: true)) key?.DeleteValue(AppName, throwOnMissingValue: false);
+        Registry.CurrentUser.DeleteSubKeyTree(ContextVerb, throwOnMissingSubKey: false);
         NotifyShell();
     }
 

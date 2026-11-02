@@ -3,13 +3,13 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using PageSmith.App.Documents;
 using PageSmith.App.Infrastructure;
 using PageSmith.Core.Pdf;
+using PageSmith.Core.Rendering;
 using PageSmith.Core.Text;
 
 namespace PageSmith.App.Controls;
@@ -48,8 +48,11 @@ public sealed class PdfViewer : UserControl
     public const double MinZoom = 0.1, MaxZoom = 8;
     private static readonly double[] ZoomSteps = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8];
 
-    /// <summary>Rendered pages kept for scrolling back, per tab.</summary>
-    private const long CacheBudget = 160L * 1024 * 1024;
+    /// <summary>Rendered pages kept for scrolling back, per tab (about seven A4 pages at 125 %).</summary>
+    private const long CacheBudget = 64L * 1024 * 1024;
+
+    /// <summary>Pages already on screen are re-rendered only once zooming has paused this long.</summary>
+    private static readonly TimeSpan ZoomSettle = TimeSpan.FromMilliseconds(250);
 
     private static readonly Brush SelectionBrush = Frozen(Color.FromArgb(0x55, 0x2F, 0x80, 0xED));
     private static readonly Brush HitBrush = Frozen(Color.FromArgb(0x66, 0xFF, 0xD4, 0x00));
@@ -60,13 +63,21 @@ public sealed class PdfViewer : UserControl
     private readonly Dictionary<int, PageView> _views = [];
     private readonly Dictionary<int, CachedPage> _cache = [];
     private readonly DispatcherTimer _renderTimer = new() { Interval = TimeSpan.FromMilliseconds(60) };
+    private readonly DispatcherTimer _settleTimer = new() { Interval = TimeSpan.FromMilliseconds(280) };
     private readonly DispatcherTimer _autoScroll = new() { Interval = TimeSpan.FromMilliseconds(40) };
     private readonly DispatcherTimer _spotTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
     private (int Page, Rect Box)? _spot;
     private ILookup<int, PageComment> _comments = Array.Empty<PageComment>().ToLookup(c => c.PageIndex);
     private DocumentSession? _session;
-    private double[] _tops = [];
-    private double _contentWidth;
+    private PageRows _grid = PageRows.Arrange([], PageLayout.Auto, 0, Gap, Edge);
+    private double[] _lefts = [];
+    private PageLayout _layout;
+
+    /// <summary>
+    /// The page last gone to and where the view was then: it stays the current page while the view is still
+    /// there, even when another page shows more (zoomed out, or near the end where the view can't scroll on).
+    /// </summary>
+    private (int Page, double Offset)? _wanted;
     private double _zoom = 1;
     private int _version;
     private bool _pumping;
@@ -135,6 +146,7 @@ public sealed class PdfViewer : UserControl
         SizeChanged += (_, _) =>
         {
             if (Mode != ZoomMode.Custom) ApplyZoom(FitZoom(), new Point(0, 0));
+            else if (ColumnsChanged()) Reflow();
             else RecenterPages();
         };
         IsVisibleChanged += (_, _) =>
@@ -146,6 +158,11 @@ public sealed class PdfViewer : UserControl
         {
             _renderTimer.Stop();
             Pump();
+        };
+        _settleTimer.Tick += (_, _) =>
+        {
+            _settleTimer.Stop();
+            UpdateVisible();
         };
         _autoScroll.Tick += OnAutoScroll;
         _scroll.PreviewMouseWheel += OnWheel;
@@ -186,7 +203,30 @@ public sealed class PdfViewer : UserControl
 
     public int CurrentPage => _currentPage;
 
-    public int PageCount => _tops.Length;
+    public int PageCount => _grid.PageCount;
+
+    /// <summary>How pages are arranged; Auto puts more side by side as you zoom out.</summary>
+    public PageLayout Layout
+    {
+        get => _layout;
+        set
+        {
+            if (_layout == value) return;
+            _layout = value;
+            if (PageCount == 0) return;
+            // Laid out again (at the new fit, if fitting), with the current page at the top.
+            var page = _currentPage;
+            if (Mode != ZoomMode.Custom) _zoom = FitZoom();
+            Relayout();
+            _scroll.UpdateLayout();
+            GoTo(page, remember: false);
+            UpdateVisible();
+            ZoomChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>The most pages side by side now.</summary>
+    public int Columns => _grid.MostPerRow;
 
     public ViewerTool Tool
     {
@@ -245,8 +285,11 @@ public sealed class PdfViewer : UserControl
         _scroll.ScrollToVerticalOffset(_pendingY.Value);
     }
 
-    /// <summary>The current version's text, once it has been read (see <see cref="DocumentSession.GetTextAsync"/>).</summary>
-    private TextIndex? Text => _session?.GetTextAsync() is { IsCompletedSuccessfully: true } t ? t.Result : null;
+    /// <summary>
+    /// The current version's text, once it has been read. Reading starts when the pointer first moves over
+    /// the pages or a search begins, so just reading a document doesn't load its text.
+    /// </summary>
+    private TextIndex? Text => _session?.LoadedText;
 
     private Size PageSize(int index) => _session!.PageSizes[index];
 
@@ -266,8 +309,14 @@ public sealed class PdfViewer : UserControl
     /// <summary>Starts over with the session's current version, keeping the reading position if asked.</summary>
     private void Reset(bool keepPosition)
     {
-        var anchor = keepPosition && _tops.Length > 0 ? CaptureAnchor() : ((int Page, double Y)?)null;
+        var anchor = keepPosition && PageCount > 0 ? CaptureAnchor() : ((int Page, double Y)?)null;
         _version++;
+        _wanted = null;
+        if (!keepPosition)
+        {
+            _back.Clear();
+            _forward.Clear();
+        }
         _cache.Clear();
         foreach (var v in _views.Values) _canvas.Children.Remove(v);
         _views.Clear();
@@ -284,7 +333,6 @@ public sealed class PdfViewer : UserControl
         _scroll.UpdateLayout();
         if (anchor is { } a) RestoreAnchor(a);
         else ScrollToY(0);
-        _ = _session?.GetTextAsync();
         UpdateVisible();
         if (hadSelection) SelectionChanged?.Invoke(this, EventArgs.Empty);
         ZoomChanged?.Invoke(this, EventArgs.Empty);
@@ -293,41 +341,59 @@ public sealed class PdfViewer : UserControl
     private (int Page, double Y) CaptureAnchor()
     {
         var y = OffsetY;
-        var page = PageAt(y);
-        return (page, (y - _tops[page]) / Scale);
+        var page = _grid.RowStart(_grid.RowAt(y));
+        return (page, (y - _grid.TopOf(page)) / Scale);
     }
 
     private void RestoreAnchor((int Page, double Y) anchor)
     {
-        if (_tops.Length == 0) return;
-        var page = Math.Min(anchor.Page, _tops.Length - 1);
-        ScrollToY(_tops[page] + anchor.Y * Scale);
+        if (PageCount == 0) return;
+        var page = Math.Min(anchor.Page, PageCount - 1);
+        ScrollToY(_grid.TopOf(page) + anchor.Y * Scale);
+    }
+
+    /// <summary>The room across for pages: the view less its edges and a scroll bar (whether or not one shows, so the columns don't flip as it comes and goes).</summary>
+    private double RoomAcross => Math.Max(50, ActualWidth - 2 * Edge - ScrollBarAllowance);
+
+    /// <summary>The rows the pages make at the current zoom and room across.</summary>
+    private PageRows Arrange()
+    {
+        var sizes = _session?.PageSizes ?? [];
+        var scale = Scale;
+        var scaled = new Size[sizes.Count];
+        for (var i = 0; i < scaled.Length; i++) scaled[i] = new Size(sizes[i].Width * scale, sizes[i].Height * scale);
+        return PageRows.Arrange(scaled, _layout, RoomAcross, Gap, Edge);
     }
 
     private void Relayout()
     {
-        var sizes = _session?.PageSizes ?? [];
-        var scale = Scale;
-        _tops = new double[sizes.Count];
-        double y = Edge, widest = 0;
-        for (var i = 0; i < sizes.Count; i++)
-        {
-            _tops[i] = y;
-            y += sizes[i].Height * scale + Gap;
-            widest = Math.Max(widest, sizes[i].Width * scale);
-        }
-        _contentWidth = widest + 2 * Edge;
-        _canvas.Height = sizes.Count == 0 ? 0 : y - Gap + Edge;
+        _grid = Arrange();
+        _lefts = new double[_grid.PageCount];
+        _canvas.Height = _grid.Height;
         RecenterPages();
     }
 
-    private void RecenterPages()
+    /// <summary>Lays the pages out again (more or fewer side by side), keeping the reading position.</summary>
+    private void Reflow()
     {
-        _canvas.Width = Math.Max(ViewportWidth, _contentWidth);
-        foreach (var v in _views.Values) Place(v);
+        if (PageCount == 0) return;
+        var anchor = CaptureAnchor();
+        Relayout();
+        _scroll.UpdateLayout();
+        RestoreAnchor(anchor);
+        UpdateVisible();
     }
 
-    private double PageLeft(int index, double scale) => (_canvas.Width - PageSize(index).Width * scale) / 2;
+    /// <summary>Whether the room across now fits a different number of pages side by side.</summary>
+    private bool ColumnsChanged() => _layout == PageLayout.Auto && !Arrange().SameRowsAs(_grid);
+
+    private void RecenterPages()
+    {
+        _canvas.Width = Math.Max(ViewportWidth, _grid.PagesWidth + 2 * Edge);
+        var left = (_canvas.Width - _grid.PagesWidth) / 2;
+        for (var i = 0; i < _lefts.Length; i++) _lefts[i] = _grid.LeftOf(i, left);
+        foreach (var v in _views.Values) Place(v);
+    }
 
     private void Place(PageView v)
     {
@@ -335,31 +401,23 @@ public sealed class PdfViewer : UserControl
         var size = PageSize(v.Index);
         v.Width = size.Width * scale;
         v.Height = size.Height * scale;
-        Canvas.SetLeft(v, PageLeft(v.Index, scale));
-        Canvas.SetTop(v, _tops[v.Index]);
+        Canvas.SetLeft(v, _lefts[v.Index]);
+        Canvas.SetTop(v, _grid.TopOf(v.Index));
         v.OverlayScale.ScaleX = v.OverlayScale.ScaleY = scale;
-    }
-
-    /// <summary>The page at a vertical position of the canvas (the one above, in the gap between two).</summary>
-    private int PageAt(double y)
-    {
-        var i = Array.BinarySearch(_tops, y);
-        if (i < 0) i = ~i - 1;
-        return Math.Clamp(i, 0, Math.Max(0, _tops.Length - 1));
     }
 
     /// <summary>Creates views for the pages in or near the viewport, drops the others and queues rendering.</summary>
     private void UpdateVisible()
     {
-        if (_tops.Length == 0 || _session == null)
+        if (PageCount == 0 || _session == null)
         {
             UpdateCurrentPage();
             return;
         }
         var height = ViewportHeight;
         var top = OffsetY;
-        var first = PageAt(top - height * 0.5);
-        var last = PageAt(top + height * 1.5);
+        var first = _grid.RowStart(_grid.RowAt(top - height * 0.5));
+        var last = _grid.RowEnd(_grid.RowAt(top + height * 1.5)) - 1;
         foreach (var index in _views.Keys.Where(i => i < first || i > last).ToList())
         {
             _canvas.Children.Remove(_views[index]);
@@ -383,17 +441,49 @@ public sealed class PdfViewer : UserControl
         if (!_pumping && !_renderTimer.IsEnabled && _views.Values.Any(NeedsRender)) _renderTimer.Start();
     }
 
+    /// <summary>
+    /// The current page is the page last gone to while the view stays there; otherwise the first page of the
+    /// row that fills most of the view (or the one picked in that row before), so zoomed out with several
+    /// rows in view it is the top one rather than one further down.
+    /// </summary>
     private void UpdateCurrentPage()
     {
         var page = 0;
-        if (_tops.Length > 0)
+        if (PageCount > 0)
         {
-            if (MaxOffsetY > 0 && OffsetY >= MaxOffsetY - 1) page = _tops.Length - 1;
-            else if (OffsetY > 1) page = PageAt(OffsetY + ViewportHeight * 0.35);
+            if (_wanted is { } wanted && wanted.Page < PageCount && Math.Abs(OffsetY - wanted.Offset) < 1.5)
+            {
+                page = wanted.Page;
+            }
+            else
+            {
+                _wanted = null;
+                var row = MostVisibleRow();
+                page = _currentPage < PageCount && _grid.RowOf(_currentPage) == row ? _currentPage : _grid.RowStart(row);
+            }
         }
         if (page == _currentPage) return;
         _currentPage = page;
         CurrentPageChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private int MostVisibleRow()
+    {
+        var top = OffsetY;
+        var bottom = top + ViewportHeight;
+        // At either end of the document, the end's row: it may be too short to fill most of the view.
+        if (top <= 1) return 0;
+        if (MaxOffsetY > 0 && top >= MaxOffsetY - 1) return _grid.RowCount - 1;
+        var best = _grid.RowAt(top);
+        var bestShown = -1.0;
+        for (var r = best; r < _grid.RowCount && _grid.RowTop(r) < bottom; r++)
+        {
+            var shown = Math.Min(bottom, _grid.RowTop(r) + _grid.RowHeight(r)) - Math.Max(top, _grid.RowTop(r));
+            if (shown <= bestShown + 1) continue;
+            best = r;
+            bestShown = shown;
+        }
+        return best;
     }
 
     // ------------------------------------------------------------------ rendering
@@ -408,13 +498,22 @@ public sealed class PdfViewer : UserControl
         return Math.Max(dpi, 8);
     }
 
+    /// <summary>
+    /// Whether a page needs (re-)rendering. A page with an image is redrawn only when zooming has paused,
+    /// and only to get sharper, or when its image is far bigger than needed (memory); a slightly sharper
+    /// image than needed looks the same and saves the work.
+    /// </summary>
     private bool NeedsRender(PageView v)
     {
         if (v.Failed) return false;
         if (v.Dpi <= 0) return true;
+        if (DateTime.UtcNow - _zoomedAt < ZoomSettle) return false;
         var target = TargetDpi(v.Index);
-        return Math.Abs(v.Dpi - target) / target > 0.12;
+        return v.Dpi < target * 0.88 || v.Dpi > target * 2;
     }
+
+    /// <summary>When the zoom last changed; renders of pages already shown wait until it settles.</summary>
+    private DateTime _zoomedAt;
 
     private PageView? NextToRender()
     {
@@ -424,7 +523,7 @@ public sealed class PdfViewer : UserControl
         foreach (var v in _views.Values)
         {
             if (!NeedsRender(v)) continue;
-            var distance = Math.Abs(_tops[v.Index] + v.Height / 2 - center);
+            var distance = Math.Abs(_grid.TopOf(v.Index) + v.Height / 2 - center);
             if (distance < bestDistance)
             {
                 bestDistance = distance;
@@ -508,14 +607,23 @@ public sealed class PdfViewer : UserControl
     {
         var sizes = _session?.PageSizes;
         if (sizes is not { Count: > 0 } || ActualWidth <= 0) return _zoom;
-        var width = Math.Max(50, ActualWidth - 2 * Edge - ScrollBarAllowance);
+        var room = RoomAcross;
+        // Two-page layouts fit both pages of a row; Auto fits one, and puts more beside it if they fit.
+        var columns = _layout is PageLayout.Two or PageLayout.Book && sizes.Count > 1 ? 2 : 1;
         var widest = sizes.Max(s => s.Width);
-        var fit = width / (widest * PointToDip);
+        var fit = (room - (columns - 1) * Gap) / (columns * widest * PointToDip);
         if (Mode == ZoomMode.FitPage)
         {
-            var page = sizes[Math.Clamp(_currentPage, 0, sizes.Count - 1)];
+            var (first, count) = PageRows.RowAround(_layout, Math.Clamp(_currentPage, 0, sizes.Count - 1), sizes.Count);
+            double tallest = 0, widestHere = 0;
+            for (var i = first; i < first + count; i++)
+            {
+                tallest = Math.Max(tallest, sizes[i].Height);
+                widestHere = Math.Max(widestHere, sizes[i].Width);
+            }
             var height = Math.Max(50, ActualHeight - 2 * Gap);
-            fit = Math.Min(width / (page.Width * PointToDip), height / (page.Height * PointToDip));
+            var across = columns == 1 ? room / (widestHere * PointToDip) : fit;
+            fit = Math.Min(across, height / (tallest * PointToDip));
         }
         return Math.Clamp(fit, MinZoom, MaxZoom);
     }
@@ -525,8 +633,11 @@ public sealed class PdfViewer : UserControl
         Mode = mode;
         if (mode == ZoomMode.Custom) return;
         var page = _currentPage;
+        var several = _grid.MostPerRow > 1;
         ApplyZoom(FitZoom(), new Point(0, 0));
-        if (mode == ZoomMode.FitPage) GoToPage(page);
+        // From several pages side by side (or to a whole page), the current page goes to the top; otherwise
+        // the view keeps its place within the page.
+        if (mode == ZoomMode.FitPage || several || _grid.MostPerRow > 1) GoTo(page, remember: false);
     }
 
     /// <summary>Zooms to <paramref name="zoom"/>, keeping the point under <paramref name="anchor"/> (viewer coordinates) in place.</summary>
@@ -542,35 +653,49 @@ public sealed class PdfViewer : UserControl
 
     private void ApplyZoom(double zoom, Point? anchor)
     {
-        if (_tops.Length == 0 || Math.Abs(zoom - _zoom) < 1e-4)
+        if (PageCount == 0 || Math.Abs(zoom - _zoom) < 1e-4)
         {
             _zoom = zoom;
-            if (_tops.Length > 0) RecenterPages();
+            if (PageCount > 0 && ColumnsChanged()) Reflow();
+            else if (PageCount > 0) RecenterPages();
             ZoomChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
         var a = anchor ?? new Point(ViewportWidth / 2, ViewportHeight / 2);
         var oldScale = Scale;
-        var cx = OffsetX + a.X;
-        var cy = OffsetY + a.Y;
-        var page = PageAt(cy);
-        var py = (cy - _tops[page]) / oldScale;
-        var px = (cx - PageLeft(page, oldScale)) / oldScale;
+        var at = new Point(OffsetX + a.X, OffsetY + a.Y);
+        var page = NearestPage(at);
+        var py = (at.Y - _grid.TopOf(page)) / oldScale;
+        var px = (at.X - _lefts[page]) / oldScale;
         _zoom = zoom;
+        // Pages on screen stretch their current image while zooming and are redrawn once it pauses.
+        _zoomedAt = DateTime.UtcNow;
+        _settleTimer.Stop();
+        _settleTimer.Start();
+        // Zoomed out far enough, more pages fit side by side: the rows change, the point under the pointer stays.
         Relayout();
         _scroll.UpdateLayout();
         var scale = Scale;
-        ScrollToY(_tops[page] + py * scale - a.Y);
-        ScrollToX(PageLeft(page, scale) + px * scale - a.X);
+        ScrollToY(_grid.TopOf(page) + py * scale - a.Y);
+        ScrollToX(_lefts[page] + px * scale - a.X);
         UpdateVisible();
         ZoomChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public void GoToPage(int index)
+    /// <summary>Brings a page's row to the top of the view. Jumps further than the next page can be gone back from.</summary>
+    public void GoToPage(int index, bool remember = true) => GoTo(index, remember);
+
+    private void GoTo(int index, bool remember)
     {
-        if (_tops.Length == 0) return;
-        index = Math.Clamp(index, 0, _tops.Length - 1);
-        ScrollToY(_tops[index] - Gap / 2);
+        if (PageCount == 0) return;
+        index = Math.Clamp(index, 0, PageCount - 1);
+        if (remember && Math.Abs(index - _currentPage) > 1 && _grid.RowOf(index) != _grid.RowOf(Math.Min(_currentPage, PageCount - 1))) Remember();
+        ScrollToY(_grid.RowTop(_grid.RowOf(index)) - Gap / 2);
+        // A page out of view to the side (zoomed in on two pages) is brought in too.
+        var width = PageSize(index).Width * Scale;
+        if (_lefts[index] + width < OffsetX || _lefts[index] > OffsetX + ViewportWidth)
+            ScrollToX(_lefts[index] + width / 2 - ViewportWidth / 2);
+        _wanted = (index, OffsetY);
         // Show the new page number at once, before the scroll has been laid out.
         if (_currentPage != index)
         {
@@ -579,15 +704,68 @@ public sealed class PdfViewer : UserControl
         }
     }
 
-    public void NextPage() => GoToPage(_currentPage + 1);
+    /// <summary>Two pages side by side are turned together, like a book's.</summary>
+    private bool Spreads => _layout is PageLayout.Two or PageLayout.Book && PageCount > 1;
 
-    public void PreviousPage() => GoToPage(_currentPage - 1);
+    public void NextPage()
+    {
+        if (PageCount == 0) return;
+        GoTo(Spreads ? _grid.RowEnd(_grid.RowOf(_currentPage)) : _currentPage + 1, remember: false);
+    }
+
+    public void PreviousPage()
+    {
+        if (PageCount == 0) return;
+        GoTo(Spreads ? _grid.RowStart(Math.Max(0, _grid.RowOf(_currentPage) - 1)) : _currentPage - 1, remember: false);
+    }
+
+    // ------------------------------------------------------------------ back and forward
+
+    /// <summary>Places to go back and forward to: where the view was (as an anchor) and the page shown as current.</summary>
+    private readonly List<(int Page, double Y, int Current)> _back = [], _forward = [];
+
+    public bool CanGoBack => _back.Count > 0;
+
+    public bool CanGoForward => _forward.Count > 0;
+
+    /// <summary>Keeps where the view is before a jump (a link, a bookmark, a page far away), to come back with Alt+Left.</summary>
+    private void Remember()
+    {
+        if (PageCount == 0) return;
+        _back.Add(Here());
+        if (_back.Count > 50) _back.RemoveAt(0);
+        _forward.Clear();
+    }
+
+    public void GoBack() => Step(_back, _forward);
+
+    public void GoForward() => Step(_forward, _back);
+
+    private (int Page, double Y, int Current) Here()
+    {
+        var (page, y) = CaptureAnchor();
+        return (page, y, _currentPage);
+    }
+
+    private void Step(List<(int Page, double Y, int Current)> from, List<(int Page, double Y, int Current)> to)
+    {
+        if (from.Count == 0 || PageCount == 0) return;
+        to.Add(Here());
+        var (page, y, current) = from[^1];
+        from.RemoveAt(from.Count - 1);
+        RestoreAnchor((page, y));
+        current = Math.Min(current, PageCount - 1);
+        _wanted = (current, OffsetY);
+        if (_currentPage == current) return;
+        _currentPage = current;
+        CurrentPageChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>Scrolls a rectangle of a page (in points) into view, if it isn't already.</summary>
     private void Reveal(int page, Rect box)
     {
         var scale = Scale;
-        var r = new Rect(PageLeft(page, scale) + box.X * scale, _tops[page] + box.Y * scale, box.Width * scale, box.Height * scale);
+        var r = new Rect(_lefts[page] + box.X * scale, _grid.TopOf(page) + box.Y * scale, box.Width * scale, box.Height * scale);
         if (r.Top < OffsetY + 8 || r.Bottom > OffsetY + ViewportHeight - 8)
             ScrollToY(r.Top - ViewportHeight / 3);
         if (r.Left < OffsetX || r.Right > OffsetX + ViewportWidth)
@@ -617,18 +795,20 @@ public sealed class PdfViewer : UserControl
         SelectionUpdated();
     }
 
-    public void SelectAll()
+    public async void SelectAll()
     {
-        if (_tops.Length == 0) return;
+        if (PageCount == 0 || _session == null) return;
         _anchor = new TextPosition(0, 0);
-        _focus = new TextPosition(_tops.Length - 1, int.MaxValue);
+        _focus = new TextPosition(PageCount - 1, int.MaxValue);
         SelectionUpdated();
+        // The text may not have been read yet: show the selection once it has.
+        if (Text == null && await _session.GetTextAsync() != null && _anchor != null) SelectionUpdated();
     }
 
     /// <summary>The selected text (read in the background, since a whole document can be selected).</summary>
     public async Task<string> GetSelectedTextAsync()
     {
-        if (_anchor is not { } a || _focus is not { } f || Text is not { } text) return "";
+        if (_anchor is not { } a || _focus is not { } f || _session == null || await _session.GetTextAsync() is not { } text) return "";
         try
         {
             return await Task.Run(() => text.TextBetween(a, f));
@@ -693,7 +873,7 @@ public sealed class PdfViewer : UserControl
     /// <summary>Brings an area of a page into view and outlines it for a moment (a comment picked in the list, say).</summary>
     public void ShowSpot(int page, Rect box)
     {
-        if (page < 0 || page >= _tops.Length) return;
+        if (page < 0 || page >= PageCount) return;
         var old = _spot?.Page;
         box.Inflate(3, 3);
         _spot = (page, box);
@@ -718,16 +898,36 @@ public sealed class PdfViewer : UserControl
     /// <summary>The page under a canvas point and the point in page coordinates; with <paramref name="nearest"/>, the closest page.</summary>
     private (int Page, Point Point)? HitPage(Point canvasPoint, bool nearest)
     {
-        if (_tops.Length == 0 || _session == null) return null;
+        if (PageCount == 0 || _session == null) return null;
         var scale = Scale;
-        var i = PageAt(canvasPoint.Y);
-        // In the gap below a page, the next page is nearer once past the middle.
-        if (nearest && i + 1 < _tops.Length && canvasPoint.Y > (_tops[i] + PageSize(i).Height * scale + _tops[i + 1]) / 2) i++;
+        var i = NearestPage(canvasPoint);
         var size = PageSize(i);
-        var p = new Point((canvasPoint.X - PageLeft(i, scale)) / scale, (canvasPoint.Y - _tops[i]) / scale);
+        var p = new Point((canvasPoint.X - _lefts[i]) / scale, (canvasPoint.Y - _grid.TopOf(i)) / scale);
         var inside = p.X >= 0 && p.Y >= 0 && p.X <= size.Width && p.Y <= size.Height;
         if (!inside && !nearest) return null;
         return (i, new Point(Math.Clamp(p.X, 0, size.Width), Math.Clamp(p.Y, 0, size.Height)));
+    }
+
+    /// <summary>
+    /// The page at a canvas point, or the nearest: in the row there (the next row once past the middle of the
+    /// gap below), the page closest across.
+    /// </summary>
+    private int NearestPage(Point at)
+    {
+        var row = _grid.RowAt(at.Y);
+        if (row + 1 < _grid.RowCount && at.Y > (_grid.RowTop(row) + _grid.RowHeight(row) + _grid.RowTop(row + 1)) / 2) row++;
+        var scale = Scale;
+        var best = _grid.RowStart(row);
+        var bestDistance = double.MaxValue;
+        for (var i = _grid.RowStart(row); i < _grid.RowEnd(row); i++)
+        {
+            var right = _lefts[i] + PageSize(i).Width * scale;
+            var distance = at.X < _lefts[i] ? _lefts[i] - at.X : at.X > right ? at.X - right : 0;
+            if (distance >= bestDistance) continue;
+            best = i;
+            bestDistance = distance;
+        }
+        return best;
     }
 
     private void OnLeftDown(object sender, MouseButtonEventArgs e)
@@ -799,6 +999,9 @@ public sealed class PdfViewer : UserControl
         EndDrag();
     }
 
+    /// <summary>Development aid for --stress: scrolls like a touchpad does.</summary>
+    internal void ScrollBy(double dy) => ScrollToY(OffsetY + dy);
+
     /// <summary>Development aid for --snapshot: a drag between two viewer points, through the same steps as the mouse.</summary>
     internal void SimulateDrag(Point from, Point to)
     {
@@ -810,8 +1013,21 @@ public sealed class PdfViewer : UserControl
 
     private void OnOtherDown(object sender, MouseButtonEventArgs e)
     {
-        // The middle button moves the pages, whatever the tool.
-        if (e.ChangedButton == MouseButton.Middle) StartPan(e);
+        // The middle button moves the pages, whatever the tool; a mouse's back and forward buttons retrace jumps.
+        switch (e.ChangedButton)
+        {
+            case MouseButton.Middle:
+                StartPan(e);
+                break;
+            case MouseButton.XButton1:
+                GoBack();
+                e.Handled = true;
+                break;
+            case MouseButton.XButton2:
+                GoForward();
+                e.Handled = true;
+                break;
+        }
     }
 
     private void StartPan(MouseButtonEventArgs e)
@@ -850,6 +1066,8 @@ public sealed class PdfViewer : UserControl
                 else if (!outside) _autoScroll.Stop();
                 break;
             case Drag.None when Tool == ViewerTool.Select:
+                // The pointer over the pages: text may be selected soon, so start reading it.
+                if (Text == null) _ = _session?.GetTextAsync();
                 UpdateCursor(pos);
                 break;
         }
@@ -1004,6 +1222,7 @@ public sealed class PdfViewer : UserControl
                 GoToPage(0);
                 break;
             case Key.End when !ctrl:
+                Remember();
                 ScrollToY(MaxOffsetY);
                 break;
             case Key.Space:
@@ -1052,16 +1271,18 @@ public sealed class PdfViewer : UserControl
     /// <summary>One page: white paper with a soft shadow, the rendered image and the highlight layer.</summary>
     private sealed class PageView : Grid
     {
-        private static readonly Effect Shadow = CreateShadow();
+        /// <summary>A thin edge rather than a drop shadow: shadow effects are redrawn on every scroll.</summary>
+        private static readonly Brush Edge = Frozen(Color.FromArgb(0x30, 0, 0, 0));
+
         private readonly Image _image = new() { Stretch = Stretch.Fill };
 
         public PageView(int index)
         {
             Index = index;
             Background = Brushes.White;
-            Effect = Shadow;
             RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.HighQuality);
             Children.Add(_image);
+            Children.Add(new Border { BorderBrush = Edge, BorderThickness = new Thickness(1), IsHitTestVisible = false });
             Overlay = new Canvas
             {
                 IsHitTestVisible = false,
@@ -1094,13 +1315,6 @@ public sealed class PdfViewer : UserControl
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
             });
-        }
-
-        private static Effect CreateShadow()
-        {
-            var shadow = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 1, Opacity = 0.22, Direction = 270, Color = Colors.Black };
-            shadow.Freeze();
-            return shadow;
         }
     }
 }

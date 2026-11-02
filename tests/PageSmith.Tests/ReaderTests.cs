@@ -209,11 +209,21 @@ public class ReaderTests
             Assert.Equal("\"C:\\Apps\\PageSmith\\PageSmith.exe\" \"%1\"", Value($@"{root}\Classes\Applications\PageSmith.exe\shell\open\command", ""));
             Assert.Equal(PdfAppRegistration.ProgId, Value($@"{root}\PageSmith\Capabilities\FileAssociations", ".pdf"));
             Assert.Equal($@"{root}\PageSmith\Capabilities", Value($@"{root}\RegisteredApplications", "PageSmith"));
+            // Right-clicking a PDF offers "Open with PageSmith".
+            Assert.Equal("Open with PageSmith", Value($@"{root}\Classes\SystemFileAssociations\.pdf\shell\PageSmith", "MUIVerb"));
+            Assert.Equal("\"C:\\Apps\\PageSmith\\PageSmith.exe\" \"%1\"", Value($@"{root}\Classes\SystemFileAssociations\.pdf\shell\PageSmith\command", ""));
+            // An older registration without it gets it on update; an up-to-date one is left as it is.
+            Assert.False(PdfAppRegistration.Update(exe));
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree($@"{root}\Classes\SystemFileAssociations", throwOnMissingSubKey: false);
+            Assert.True(PdfAppRegistration.Update(exe));
+            Assert.Equal("Open with PageSmith", Value($@"{root}\Classes\SystemFileAssociations\.pdf\shell\PageSmith", "MUIVerb"));
+            Assert.False(PdfAppRegistration.Update(@"D:\Elsewhere\PageSmith.exe"));
 
             PdfAppRegistration.Unregister(exe);
             Assert.False(PdfAppRegistration.IsRegistered(exe));
             Assert.Null(Value($@"{root}\Classes\.pdf\OpenWithProgids", PdfAppRegistration.ProgId));
             Assert.Null(Value($@"{root}\RegisteredApplications", "PageSmith"));
+            Assert.Null(Value($@"{root}\Classes\SystemFileAssociations\.pdf\shell\PageSmith", "MUIVerb"));
             using var app = Microsoft.Win32.Registry.CurrentUser.OpenSubKey($@"{root}\PageSmith");
             Assert.Null(app);
         }

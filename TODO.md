@@ -11,7 +11,7 @@ offline desktop app that works on the open document. This file tracks:
 For the iLovePDF research behind the feature list (plans, every tool's options, the Free vs
 Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 
-**Current version:** 0.4.0 (preview), last updated 2026-10-28.
+**Current version:** 0.5.0 (preview), last updated 2026-11-03.
 
 ---
 
@@ -20,13 +20,13 @@ Premium limits), see [docs/FEATURES.md](docs/FEATURES.md).
 | Area | State |
 |---|---|
 | iLovePDF analysis | Done: 34 features (33 tools + Workflows), Free vs Premium limits, mapping → [docs/FEATURES.md](docs/FEATURES.md) |
-| PDF engine (`PageSmith.Core`) | Done for all 33 tools and the reader; 113 automated tests, all passing |
+| PDF engine (`PageSmith.Core`) | Done for all 33 tools and the reader; 120 automated tests, all passing |
 | Online AI services (new in 0.4.0) | Claude, Gemini or OpenAI, picked from a list, for summaries and translation, with your own API keys (§1.3) |
 | Windows app (`PageSmith.App`) | **All 33 tool screens working**, plus Home, Workflows, Settings and About |
-| PDF reader (new in 0.3.0) | **Working:** documents in tabs, viewer, find, text selection, comments, print, and every PDF tool on the open document with undo (§1.2) |
+| PDF reader (new in 0.3.0) | **Working:** documents in tabs, viewer with Word-like page layouts (0.5.0), find, text selection, comments, print, and every PDF tool on the open document with undo (§1.2) |
 | Still to check by hand | A real scanner, a real camera, a real printer, *Retry* with the PC actually offline, and opening PDFs from Explorer (§2.1) |
 | Machine-learning features | Planned for v2.0 (§4) |
-| Packaging | Self-contained single-file `.exe` and zip via `scripts/publish.ps1`; no installer yet |
+| Packaging | Installer `PageSmith-Setup-<version>-win-x64.exe` via `scripts/build-installer.ps1` (§5.5), plus a self-contained single-file `.exe` and zip via `scripts/publish.ps1` |
 
 How the tools were checked:
 
@@ -89,9 +89,11 @@ and every tool works on the document in front of you.
     documents*, dropping files on the window or the tab strip, or `PageSmith.exe file.pdf`.
   - **One window:** opening a PDF from Explorer while PageSmith runs adds a tab to the open
     window instead of starting a second copy.
-  - **Settings → Opening PDFs** adds PageSmith to Windows' *Open with* list for PDFs, then opens
-    Windows' *Default apps* page, where you can make it the default PDF app. Windows doesn't let
-    apps make themselves the default, so that last click is yours.
+  - **Settings → Opening PDFs** adds PageSmith to Windows' *Open with* list for PDFs and adds
+    **Open with PageSmith** when you right-click a PDF (on Windows 11, under *Show more options*).
+    It then opens Windows' *Default apps* page, where you can make it the default PDF app. Windows
+    doesn't let apps make themselves the default, so that last click is yours. A copy registered
+    by an older version gets the right-click command the next time it starts.
   - **Images, Word, Excel, PowerPoint and web pages** open as new PDFs, unsaved until you save
     them. Password-protected PDFs ask for their password.
   - Opening a file that is already open just switches to its tab.
@@ -104,7 +106,17 @@ and every tool works on the document in front of you.
   - Closing a tab or the window with unsaved changes asks *Save*, *Don't save* or *Cancel*.
 - **Viewer.**
   - All pages in one continuous scroll. Only pages in or near the view are rendered, and they are
-    re-rendered sharp after zooming, so 300-page documents open and scroll quickly.
+    re-rendered sharp after zooming, so 2,000-page documents open and scroll quickly.
+  - **Page layout (0.5.0)**, from the grid button next to *Fit page*:
+    - *Automatic* (the default): one page per row, and more side by side as you zoom out, like
+      Word. Each row holds as many pages as fit, so mixed portrait and landscape pages pack well.
+    - *One page*, *Two pages*, and *Book* (two pages with the cover on its own). With two pages,
+      next/previous page turns both.
+  - **Back and forward (0.5.0):** after a jump (a link, a bookmark, a thumbnail or page number
+    far away, Home/End), **Alt+←** or the mouse's back button returns; **Alt+→** goes forward again.
+    Also in the pages' right-click menu.
+  - **Reopens where you left off (0.5.0):** each document opens at the page and zoom it was closed
+    at (the last 100 documents are remembered).
   - Zoom: **Ctrl + mouse wheel** (around the pointer), **Ctrl +/−**, the zoom box (type any
     percentage), *Fit width* (**Ctrl+2**), *Fit page* (**Ctrl+0**), actual size (**Ctrl+1**).
   - Page box (**Ctrl+G**), previous/next page, Home/End, Space, Page Up/Down.
@@ -114,7 +126,8 @@ and every tool works on the document in front of you.
   - **Links** work: links inside the document go to their page; web and e-mail links show where
     they go and ask before opening. Other kinds of links are not opened.
 - **Side panels.**
-  - **Pages:** thumbnails that follow the page you're reading. Right-click for *Rotate*, *Delete*,
+  - **Pages:** thumbnails that follow the page you're reading; the current page is outlined and
+    selected pages are filled. Right-click for *Rotate*, *Delete*,
     *Extract to a new tab*, *Insert pages from a file* and *Insert a blank page*. Drag thumbnails
     to move pages. Drop PDFs or images on the thumbnails to insert them at that spot.
   - **Bookmarks:** the document's outline; click to go there.
@@ -196,6 +209,31 @@ and every tool works on the document in front of you.
 
 ### 1.4 Fixed since 0.1.0
 
+- **Speed and memory (0.5.0).** Measured with the `--stress` run (§5.6) on 300- and 2,100-page PDFs:
+  - Scrolling used two CPU cores and could make Windows show *Not responding*. The page thumbnails
+    called WPF's *scroll into view* at every page you passed, which lays the whole list out again;
+    on its own that took most of the window's time. Scrolling 40 pages now takes 2 s instead of
+    11–14 s, and a fifth of the CPU (on 2,100 pages: 4 s of CPU instead of 21 s).
+  - Pages are drawn straight from the renderer's pixels instead of through an image decoder, a
+    third faster, and PDFs load into native memory in chunks (opening 2,100 pages: 73 ms, not 479 ms).
+  - An idle window used 7–15% of a CPU core: hidden loading spinners kept animating. Now 0%.
+  - Peak memory on a 300-page document fell from 1,057 MB to about 770 MB (page cache capped at
+    64 MB per tab, thumbnails rendered at their size, memory handed back after closing a tab or
+    running a tool).
+- **Page thumbnails (0.5.0).**
+  - They could jump back and forth while you scrolled and lose the current page. They now follow a
+    moment later, centred, and every thumbnail has the same height, so the list always knows where
+    the current page is.
+  - With several pages selected (to rotate or delete them), the thumbnails stopped following the
+    page you were reading. The current page now has its own outline.
+  - A click on a thumbnail could later start dragging pages on its own when the mouse moved with
+    the button down.
+- **Page box (0.5.0).** Leaving the page box (clicking the pages after scrolling) sent the view
+    back to the old page number still shown in it. It now only goes to a number you typed.
+- **Current page when zoomed out (0.5.0).** With several pages in view, the page number showed a
+  page further down instead of the one at the top, or the one you had gone to.
+- **Wording (0.5.0).** About 60 long hints and messages were shortened.
+
 - **Touchpad and wheel scrolling (0.3.1).**
   - In the reader, a touchpad barely scrolled. A touchpad sends many small scroll steps between two
     screen updates, and each step started from the old position, so only the last one counted. The
@@ -254,8 +292,8 @@ and every tool works on the document in front of you.
 - **Compiler warnings.** A Release build shows about 8 warnings: nullability in
   `MicrosoftOffice.cs` and `WordDiff.cs`, and obsolete PdfPig/PDFsharp APIs. They are harmless
   but should be cleaned up.
-- **No installer or code signing yet.** Windows SmartScreen may warn the first time you run a
-  downloaded `PageSmith.exe`.
+- **No code signing yet.** Windows SmartScreen may warn the first time you run a downloaded
+  installer or `PageSmith.exe` (*More info → Run anyway*).
 
 ---
 
@@ -302,13 +340,12 @@ Work happens on `feature/*` branches cut from `develop` (see §6).
 - [ ] Release:
   1. Set `<Version>1.0.0</Version>` in `Directory.Build.props`.
   2. Create `release/1.0.0` from `develop`.
-  3. Run `scripts/publish.ps1 -Zip`.
+  3. Run `scripts/publish.ps1 -Zip` and `scripts/build-installer.ps1 -SkipTests`.
   4. Merge into `main` and tag `v1.0.0`.
   5. Merge back into `develop`.
-  6. Attach the zip to a GitHub release.
+  6. Attach the installer and the zip to a GitHub release.
 - [ ] Nice to have:
-  - an installer (MSIX or Inno Setup) with *Open with* file associations and Start-menu shortcut;
-  - code signing;
+  - code signing (for the installer and `PageSmith.exe`);
   - GitHub Actions CI (`windows-latest`: build, test, publish artifact);
   - an Explorer context menu ("Compress with PageSmith", "Merge with PageSmith").
 
@@ -363,6 +400,7 @@ downloaded, PageSmith asks first, checks the connection, and offers *Retry* if o
 | [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (10.0.100 or later) | Developed with 10.0.401. Install with `winget install Microsoft.DotNet.SDK.10`. Check with `dotnet --version`. |
 | Git | To clone the repository. |
 | Internet access for the **first** build only | NuGet downloads the packages once. After that, building and running work offline. |
+| [Inno Setup 6](https://jrsoftware.org/isinfo.php) (only for the installer) | Install with `winget install --id JRSoftware.InnoSetup -e --scope user`. Built with 6.7.3. |
 | An IDE (optional) | Visual Studio 2026 with the *.NET desktop development* workload, JetBrains Rider, or VS Code with C# Dev Kit. The command line alone is enough. |
 
 Optional components the app uses at run time if they are present:
@@ -489,6 +527,26 @@ dotnet publish src/PageSmith.App -c Release -r win-x64 --self-contained false -o
 `artifacts/` is git-ignored. Copy the `.exe` (or the zip) to any Windows 10/11 x64 PC and run
 it; nothing needs installing.
 
+**The installer.** To build `artifacts/installer/PageSmith-Setup-<version>-<runtime>.exe`, which
+installs PageSmith on other PCs like any Windows app:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1
+```
+
+- It runs `publish.ps1 -Folder` (tests included; pass `-SkipTests` to skip them, `-Runtime
+  win-arm64` for ARM64), then compiles `installer/PageSmith.iss` with Inno Setup 6.
+- The setup works offline, needs no .NET on the target PC, and asks whether to install **only for
+  me** (no admin rights, `%LOCALAPPDATA%\Programs\PageSmith`) or **for all users** (Program Files).
+  It adds a Start-menu shortcut, an optional desktop shortcut and, optionally, the same *Open with*
+  entry as *Settings → Opening PDFs*. It follows the Windows light or dark theme.
+- Running a newer installer upgrades in place and offers to close a running PageSmith. Uninstall
+  from *Settings → Apps*; it asks whether to delete your settings, API keys and workflows too.
+- Silent install, for example from a script: `PageSmith-Setup-<version>-win-x64.exe /VERYSILENT
+  /CURRENTUSER` installs with the default choices (desktop shortcut and *Open with*). Add
+  `/MERGETASKS="!desktopicon,!openwith"` to skip them, or use `/ALLUSERS` from an admin prompt.
+- The wizard images in `installer/` come from `tools/IconGen`; rerun it after changing the icon.
+
 ### 5.6 Developer notes
 
 - **Project layout:**
@@ -498,6 +556,8 @@ it; nothing needs installing.
   Directory.Build.props        shared target framework, version, nullable settings
   docs/FEATURES.md             iLovePDF analysis and PageSmith mapping
   scripts/publish.ps1          release build script
+  scripts/build-installer.ps1  builds the Inno Setup installer from installer/PageSmith.iss
+  installer/                   PageSmith.iss and the wizard images
   src/PageSmith.Core/          all PDF work, no UI: Tools/, Pdf/, Text/, Imaging/, Ocr/, Office/, Intelligence/, Workflows/, Net/
   src/PageSmith.App/           WPF app:
     Controls/                  the reader: DocumentTabs, DocumentView (toolbar, panels, find, tool mode),
@@ -511,7 +571,7 @@ it; nothing needs installing.
     Infrastructure/            registry, settings, services, PdfPrinter, WebPageCapture (HTML), ScanSources (WIA)
     Pages/                     Home, Workflows, Settings, About
   tests/PageSmith.Tests/       xUnit tests for the engines
-  tools/IconGen/               renders Assets/PageSmith.ico and PNG icons
+  tools/IconGen/               renders Assets/PageSmith.ico, PNG icons and the installer's wizard images
   ```
 
 - **Adding a tool:**
@@ -538,6 +598,7 @@ it; nothing needs installing.
     own settings.
   - `--page` also accepts `home`, `workflows`, `settings` and `about`.
   - **Reader:** `--files` without `--page` opens the files in tabs. Then:
+    - `--layout auto|single|two|book` picks the page layout and `--zoom 40|width|page` the zoom;
     - `--goto 12` goes to a page, `--select-all` selects all text, and `--drag 200,280,560,370`
       drags the mouse between two points of the page view (same steps as a real drag);
     - `--find "text"` searches, `--highlight "text"` highlights the first match, and
@@ -549,6 +610,10 @@ it; nothing needs installing.
       ones;
     - `--doc-tool rotate` opens a tool on the document; add `--run` (and `--demo`) to run it,
       which replaces the document like the real button does.
+  - **Stress run:** `--stress report.txt` (with `--files`) drives the reader through opening,
+    scrolling, the thumbnails following, layouts, back/forward, zooming, find, select all, rotate,
+    undo and a tool, then writes each step's time, longest UI freeze, CPU and memory, and exits.
+    Windows shows *Not responding* after about 5 s of freeze; keep every step well under 1 s.
 
   ```bash
   PageSmith.exe --files "report.pdf" --find "revenue" --panel bookmarks --theme dark --snapshot reader.png
@@ -574,12 +639,19 @@ it; nothing needs installing.
   - Each open document works on private copies in `%TEMP%\PageSmith\Documents\<id>`: one folder
     per version (for undo) plus tool results. The folder is deleted when its tab closes.
   - *Settings → Opening PDFs* writes only under `HKEY_CURRENT_USER`: the `PageSmith.Document`
-    ProgID, `.pdf\OpenWithProgids`, `Applications\PageSmith.exe`, `Software\PageSmith\Capabilities`
-    and `RegisteredApplications`. *Remove* deletes them again.
+    ProgID, `.pdf\OpenWithProgids`, `Applications\PageSmith.exe`, `Software\PageSmith\Capabilities`,
+    `RegisteredApplications` and the right-click command `SystemFileAssociations\.pdf\shell\PageSmith`.
+    *Remove* deletes them again.
 - **Wheel and touchpad scrolling** for every scroll view is handled in
   `Infrastructure/WheelScrolling.cs` (registered at start-up); the reader's page view does its own in
   `PdfViewer.OnWheel`. Scroll views apply a new offset at their next layout pass, so code that scrolls
   several times in a row must continue from the offset it last asked for, not `VerticalOffset`.
+- **The reader's layout** comes from `PageRows` (Core/Rendering): which pages share a row, where
+  each goes, and the row at a height. `PdfViewer` keeps the current page as the one it went to while
+  the view stays there, else the row that fills most of the view.
+- **The page thumbnails** must never call `ScrollIntoView` while the pages scroll: with a
+  virtualizing list it lays the list out again each time. `DocumentView.RevealCurrentThumb` works out
+  where a thumbnail is from one in view, since all have the same height.
 - **The reader's rendering** uses `Windows.Data.Pdf` through `PdfRenderer`, which serializes
   renders. Disposing a renderer waits for a render in progress, so a viewer can swap renderers
   when the document changes. Text for find and selection comes from `TextIndex` (PdfPig), read

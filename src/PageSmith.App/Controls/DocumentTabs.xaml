@@ -64,10 +64,11 @@
                     VerticalAlignment="Center"
                     Orientation="Horizontal"
                     Visibility="{Binding Opening, Converter={StaticResource NullToVisibility}}">
+                    <!--  Spins only while opening: a hidden spinning ring still redraws the window all the time.  -->
                     <ui:ProgressRing
                         Width="16"
                         Height="16"
-                        IsIndeterminate="True" />
+                        IsIndeterminate="{Binding Opening, Converter={StaticResource HasValue}}" />
                     <TextBlock
                         MaxWidth="220"
                         Margin="8,0,0,0"

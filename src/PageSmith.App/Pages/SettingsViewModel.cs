@@ -120,7 +120,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         ConnectivityText = "Checking…";
         ConnectivityText = await Connectivity.HasInternetAsync()
             ? "Connected to the internet. Online features are available."
-            : "No internet connection. Local tools work normally; translation, web pages and Claude need a connection.";
+            : "Offline. Local tools work; translation, web pages and AI services need the internet.";
     }
 
     [RelayCommand]
@@ -143,8 +143,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     public bool IsPdfAppRegistered => PdfAppRegistration.IsRegistered(Exe);
 
     public string PdfAppStatus => IsPdfAppRegistered
-        ? "PageSmith is in the “Open with” list for PDFs. To open every PDF with it, choose it in Windows’ Default apps."
-        : "Add PageSmith to the “Open with” list for PDFs, then choose it as the default PDF app in Windows’ Default apps.";
+        ? "PDFs can open in PageSmith from “Open with” and the right-click menu. To make it the default, pick it in Default apps."
+        : "Add PageSmith to “Open with” and the right-click menu for PDFs.";
 
     /// <summary>Registers PageSmith for PDFs and opens Windows' default apps page, where the user makes it the default.</summary>
     [RelayCommand]
@@ -209,7 +209,7 @@ public sealed partial class AiServiceSettings : ObservableObject
     };
 
     public string Privacy =>
-        $"Used only when you pick {AiService.Describe(Provider)} in Summarize or Translate PDF. The document's text is then sent to {AiService.Company(Provider)}, with your key.";
+        $"Used only when you pick {AiService.Describe(Provider)} in Summarize or Translate PDF; the text is sent to {AiService.Company(Provider)}.";
 
     public string ApiKey
     {

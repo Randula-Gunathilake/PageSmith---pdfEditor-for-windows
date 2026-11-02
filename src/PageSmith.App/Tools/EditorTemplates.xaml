@@ -101,7 +101,7 @@
                 Margin="0,10,0,0"
                 Content="Cover what's underneath"
                 IsChecked="{Binding HasBackground}"
-                ToolTip="Draws a box behind the text so the original content doesn't show through." />
+                ToolTip="Hides what's behind the text" />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Opacity" />
             <Slider
                 LargeChange="0.1"
@@ -116,7 +116,7 @@
         <StackPanel>
             <TextBlock
                 Style="{StaticResource OptionHint}"
-                Text="A white box that hides whatever is underneath it. Resize it with its handles."
+                Text="A white box that covers what's under it."
                 Visibility="{Binding IsWhiteout, Converter={StaticResource BoolToVisibility}}" />
             <StackPanel Visibility="{Binding IsWhiteout, Converter={StaticResource BoolToVisibilityInverted}}">
                 <TextBlock Style="{StaticResource OptionHeader}" Text="Line colour" />
@@ -273,10 +273,10 @@
         <StackPanel>
             <TextBlock
                 Style="{StaticResource NoDocumentHint}"
-                Text="Add a PDF, then drag the frame on the page to choose the area to keep."
+                Text="Add a PDF, then drag the frame around the area to keep."
                 Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
             <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Style="{StaticResource OptionHint}" Text="Drag the frame or its handles on the page. Everything outside the frame is cut away." />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Drag the frame or its handles. Everything outside is cut away." />
                 <TextBlock Style="{StaticResource OptionHeader}" Text="Crop" />
                 <RadioButton IsChecked="{Binding CurrentPageOnly, Converter={StaticResource InverseBool}}" Style="{StaticResource OptionCard}">
                     <StackPanel>
@@ -310,7 +310,7 @@
                         </ui:Button.Icon>
                     </ui:Button>
                 </WrapPanel>
-                <TextBlock Style="{StaticResource OptionHint}" Text="Cropping hides the outside area in every PDF viewer. To remove sensitive content for good, use Redact PDF." />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Cropping hides the outside area but doesn't delete it. For sensitive content, use Redact PDF." />
             </StackPanel>
         </StackPanel>
     </DataTemplate>
@@ -321,7 +321,7 @@
         <StackPanel>
             <TextBlock
                 Style="{StaticResource NoDocumentHint}"
-                Text="Add a PDF, then use the toolbar above the page to add text, images, shapes and drawings, or to change existing text."
+                Text="Add a PDF, then use the toolbar to add or change text, images, shapes and drawings."
                 Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
             <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock
@@ -362,7 +362,7 @@
         <StackPanel>
             <TextBlock
                 Style="{StaticResource NoDocumentHint}"
-                Text="Add a PDF, then place your signature, initials, name, date or company stamp on it. You can also sign it with a digital certificate."
+                Text="Add a PDF, then place your signature, initials, date or stamp. You can also sign with a certificate."
                 Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
             <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Style="{StaticResource OptionHint}" Text="Pick a part in the toolbar above the page, then click where it goes." />
@@ -443,7 +443,7 @@
                     Margin="0,16,0,6"
                     Background="{DynamicResource CardStrokeColorDefaultBrush}" />
                 <CheckBox Content="Sign with a certificate (digital signature)" IsChecked="{Binding UseDigital}" />
-                <TextBlock Style="{StaticResource OptionHint}" Text="Proves who signed and shows if the PDF is changed afterwards. A Premium feature on iLovePDF." />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Proves who signed and shows any later changes." />
                 <StackPanel Visibility="{Binding UseDigital, Converter={StaticResource BoolToVisibility}}">
                     <TextBlock Style="{StaticResource OptionHeader}" Text="Certificate" />
                     <WrapPanel>
@@ -470,7 +470,7 @@
                             SelectedItem="{Binding SelectedCertificate}" />
                         <TextBlock
                             Style="{StaticResource OptionHint}"
-                            Text="No signing certificates were found in your Windows certificate store. Use a .pfx file or create a new certificate."
+                            Text="No certificates found on this PC. Use a .pfx file or create one."
                             Visibility="{Binding NoStoreCertificates, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                     <StackPanel Visibility="{Binding Source, Converter={StaticResource EnumToVisibility}, ConverterParameter=File}">
@@ -509,7 +509,7 @@
                                 <ui:SymbolIcon Symbol="Certificate24" />
                             </ui:Button.Icon>
                         </ui:Button>
-                        <TextBlock Style="{StaticResource OptionHint}" Text="A self-signed certificate. PDF readers show the signature as valid but from an unverified signer until they trust it." />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="Self-signed: readers show the signer as unverified until they trust it." />
                     </StackPanel>
                     <TextBlock Style="{StaticResource OptionHeader}" Text="Reason and place (optional)" />
                     <ui:TextBox PlaceholderText="Reason, e.g. I approve this document" Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" />
@@ -525,7 +525,7 @@
                     <TextBlock
                         Margin="0,10,0,0"
                         Style="{StaticResource OptionHint}"
-                        Text="Invisible signature. To show it on the page, pick the certificate tool above the page and drag a box."
+                        Text="Invisible signature. To show it, pick the certificate tool and drag a box on the page."
                         Visibility="{Binding HasDigitalBox, Converter={StaticResource BoolToVisibilityInverted}}" />
                     <CheckBox
                         Margin="0,6,0,0"
@@ -546,10 +546,10 @@
         <StackPanel>
             <TextBlock
                 Style="{StaticResource NoDocumentHint}"
-                Text="Add a PDF, then mark the text, pictures or areas to hide. Redacted content is removed from the file for good, not just covered."
+                Text="Add a PDF, then mark what to hide. Redacted content is removed for good."
                 Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
             <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Style="{StaticResource OptionHint}" Text="Drag over areas or click words on the page, or let PageSmith find them. Check the list, then press Redact PDF." />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Drag over areas, click words, or let PageSmith find them. Then press Redact PDF." />
 
                 <TextBlock Style="{StaticResource OptionHeader}" Text="Search" />
                 <Grid>
@@ -683,7 +683,7 @@
                     Margin="0,10,0,0"
                     Content="Also remove the title, author and keywords"
                     IsChecked="{Binding RemoveMetadata}" />
-                <TextBlock Style="{StaticResource OptionHint}" Text="Pages with marks are rebuilt as images with the boxes burnt in, so hidden text, pictures and drawings are really gone. The rest of the text stays searchable." />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Marked pages are rebuilt as images, so hidden content is really gone. Other text stays searchable." />
             </StackPanel>
         </StackPanel>
     </DataTemplate>
@@ -694,7 +694,7 @@
         <StackPanel>
             <TextBlock
                 Style="{StaticResource NoDocumentHint}"
-                Text="Add a PDF to fill in its form, add new fillable fields, or let PageSmith find where fields belong."
+                Text="Add a PDF to fill in its form or add fields."
                 Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibilityInverted}}" />
             <StackPanel Visibility="{Binding HasDocument, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Style="{StaticResource OptionHint}" Text="{Binding Summary}" />
@@ -717,7 +717,7 @@
                         </ui:Button.Icon>
                     </ui:Button>
                 </WrapPanel>
-                <TextBlock Style="{StaticResource OptionHint}" Text="Detect fields looks for underlines, empty boxes and tick boxes and adds fields there for you to check." />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Detect fields adds fields at underlines, empty boxes and tick boxes." />
                 <CheckBox
                     Margin="0,10,0,0"
                     Content="Flatten the form after filling"

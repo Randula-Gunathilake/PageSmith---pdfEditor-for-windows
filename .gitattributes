@@ -10,3 +10,4 @@
 *.jpg binary
 *.pdf binary
 *.onnx binary
+*.iss text eol=crlf
