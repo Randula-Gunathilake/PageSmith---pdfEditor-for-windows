@@ -209,7 +209,7 @@ public sealed partial class OrganizeController() : PageGridController("organize"
     public override bool AllowDelete => true;
     public override bool AllowInsert => true;
     public override bool ClickSelects => true;
-    public override string Hint => "Drag pages to reorder. Hover a page to rotate, duplicate, delete or insert a blank page after it.";
+    public override string Hint => "Drag pages to reorder. Hover a page for more actions.";
 
     [ObservableProperty] public partial string OutputName { get; set; } = "organized";
 
@@ -254,7 +254,7 @@ public sealed partial class RotateController() : PageGridController("rotate")
 {
     public override bool AllowRotate => true;
     public override bool ClickSelects => true;
-    public override string Hint => "Hover a page to rotate it, or select pages and use Rotate left/right. With nothing selected, the buttons rotate every page.";
+    public override string Hint => "Hover a page to rotate it, or select pages and use the buttons (all pages if none are selected).";
 
     [ObservableProperty] public partial PageFilter Filter { get; set; } = PageFilter.All;
 

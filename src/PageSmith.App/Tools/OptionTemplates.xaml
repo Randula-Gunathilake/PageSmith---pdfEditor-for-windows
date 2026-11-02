@@ -17,7 +17,7 @@
     <!--  ============================== Organize  -->
     <DataTemplate DataType="{x:Type tools:MergeController}">
         <StackPanel>
-            <TextBlock Style="{StaticResource OptionHint}" Text="Drag the files (or use the arrows) to set the order. Rotate a file from its card." />
+            <TextBlock Style="{StaticResource OptionHint}" Text="Drag files to reorder. Rotate a file from its card." />
             <TextBlock Style="{StaticResource OptionHeader}" Text="File name" />
             <ui:TextBox PlaceholderText="merged" Text="{Binding OutputName, UpdateSourceTrigger=PropertyChanged}" />
             <CheckBox
@@ -258,7 +258,7 @@
 
     <DataTemplate DataType="{x:Type tools:OrganizeController}">
         <StackPanel>
-            <TextBlock Style="{StaticResource OptionHint}" Text="Add more PDFs with the + button above the pages; their pages join the end." />
+            <TextBlock Style="{StaticResource OptionHint}" Text="Add PDFs with + to append their pages." />
             <TextBlock Style="{StaticResource OptionHeader}" Text="File name" />
             <ui:TextBox PlaceholderText="organized" Text="{Binding OutputName, UpdateSourceTrigger=PropertyChanged}" />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Pages" />
@@ -309,12 +309,12 @@
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type tools:RepairController}">
-        <TextBlock Style="{StaticResource OptionHint}" Text="PageSmith rebuilds the document structure, recovers pages one by one, and as a last resort re-renders every page that can still be displayed. If the file turns out to be another format (an image or an Office document with a .pdf extension) it is saved with the right extension." />
+        <TextBlock Style="{StaticResource OptionHint}" Text="Rebuilds the file and recovers what it can, page by page. Files that aren't really PDFs get the right extension." />
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type tools:OcrController}">
         <StackPanel>
-            <TextBlock Style="{StaticResource OptionHint}" Text="Text recognition runs on this PC with the OCR engine built into Windows." />
+            <TextBlock Style="{StaticResource OptionHint}" Text="Runs on this PC with Windows' built-in OCR." />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Document language" />
             <ComboBox
                 DisplayMemberPath="DisplayName"
@@ -384,7 +384,7 @@
 
     <DataTemplate DataType="{x:Type tools:ScanController}">
         <StackPanel>
-            <TextBlock Style="{StaticResource OptionHint}" Text="Scan pages, photograph them or add photos, then put them in order. Each image becomes a page." />
+            <TextBlock Style="{StaticResource OptionHint}" Text="Scan, photograph or add images, then order them. Each image becomes a page." />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Colour" />
             <WrapPanel>
                 <RadioButton
@@ -403,7 +403,7 @@
                     IsChecked="{Binding ColorMode, Converter={StaticResource EnumEquals}, ConverterParameter=BlackAndWhite}"
                     Style="{StaticResource Segment}" />
             </WrapPanel>
-            <TextBlock Style="{StaticResource OptionHint}" Text="Black &amp; white evens out shadows and makes text crisp, which suits photos of paper." />
+            <TextBlock Style="{StaticResource OptionHint}" Text="Black &amp; white removes shadows and sharpens text." />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Page orientation" />
             <WrapPanel>
                 <RadioButton
@@ -645,7 +645,7 @@
                     Content="Use Microsoft Word's PDF reflow when available"
                     IsChecked="{Binding UseWord}"
                     IsEnabled="{Binding WordInstalled}" />
-                <TextBlock Style="{StaticResource OptionHint}" Text="The built-in converter is fast and always works offline; Word can give a closer layout for complex documents but is slower." />
+                <TextBlock Style="{StaticResource OptionHint}" Text="Built-in is fast and offline. Word can match complex layouts better but is slower." />
             </StackPanel>
             <StackPanel Visibility="{Binding IsPowerPoint, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Style="{StaticResource OptionHeader}" Text="Slides" />
@@ -674,7 +674,7 @@
 
     <DataTemplate DataType="{x:Type tools:PdfToPdfAController}">
         <StackPanel>
-            <TextBlock Style="{StaticResource OptionHint}" Text="PDF/A is the ISO standard for long-term archiving. Choose the conformance level:" />
+            <TextBlock Style="{StaticResource OptionHint}" Text="PDF/A is the standard for long-term archiving. Level:" />
             <ListBox
                 Margin="0,6,0,0"
                 Background="Transparent"
@@ -695,7 +695,7 @@
 
     <DataTemplate DataType="{x:Type tools:PdfToMarkdownController}">
         <StackPanel>
-            <TextBlock Style="{StaticResource OptionHint}" Text="Headings, paragraphs, lists, tables and links are turned into Markdown." />
+            <TextBlock Style="{StaticResource OptionHint}" Text="Headings, lists, tables and links become Markdown." />
             <CheckBox
                 Margin="0,10,0,0"
                 Content="Save images next to the Markdown file"
@@ -979,7 +979,7 @@
 
     <!--  ============================== Security  -->
     <DataTemplate DataType="{x:Type tools:UnlockController}">
-        <TextBlock Style="{StaticResource OptionHint}" Text="Permission restrictions are removed automatically. For files that need a password to open, click Unlock on the file and enter it." />
+        <TextBlock Style="{StaticResource OptionHint}" Text="Restrictions are removed automatically. For a file with an open password, click Unlock on it." />
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type tools:ProtectController}">
@@ -1095,19 +1095,19 @@
         <StackPanel>
             <TextBlock
                 Style="{StaticResource OptionHint}"
-                Text="Add two PDFs: the original first, then the new version. Drag the cards to change the order."
+                Text="Add the original PDF first, then the new version."
                 Visibility="{Binding HasPair, Converter={StaticResource BoolToVisibilityInverted}}" />
             <TextBlock Style="{StaticResource OptionHeader}" Text="Compare" />
             <RadioButton IsChecked="{Binding Overlay, Converter={StaticResource InverseBool}}" Style="{StaticResource OptionCard}">
                 <StackPanel>
                     <TextBlock FontWeight="SemiBold" Text="Text changes" />
-                    <TextBlock Style="{StaticResource OptionHint}" Text="Words added, removed or changed, highlighted on both versions, with a change report." />
+                    <TextBlock Style="{StaticResource OptionHint}" Text="Highlights words added, removed or changed, with a report." />
                 </StackPanel>
             </RadioButton>
             <RadioButton IsChecked="{Binding Overlay}" Style="{StaticResource OptionCard}">
                 <StackPanel>
                     <TextBlock FontWeight="SemiBold" Text="Visual overlay" />
-                    <TextBlock Style="{StaticResource OptionHint}" Text="Pages laid over each other to spot changes in pictures, drawings and layout." />
+                    <TextBlock Style="{StaticResource OptionHint}" Text="Overlays pages to show changes in pictures and layout." />
                 </StackPanel>
             </RadioButton>
             <StackPanel Visibility="{Binding Overlay, Converter={StaticResource BoolToVisibilityInverted}}">
@@ -1186,7 +1186,7 @@
                 <ComboBoxItem Content="Gemini by Google (API key)" Tag="Gemini" />
                 <ComboBoxItem Content="OpenAI (API key)" Tag="OpenAI" />
             </ComboBox>
-            <TextBlock Style="{StaticResource OptionHint}" Text="Translation needs the internet. Configure services in Settings › AI services." />
+            <TextBlock Style="{StaticResource OptionHint}" Text="Needs the internet. Set up services in Settings › AI services." />
             <CheckBox
                 Margin="0,8,0,0"
                 Content="Also save the translated text (.txt)"

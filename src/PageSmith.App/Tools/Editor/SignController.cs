@@ -40,7 +40,7 @@ public sealed partial class SignController() : EditorController("sign")
     private static readonly EditorTool TextTool = new("text", "Place text", SymbolRegular.TextT24, PointerAction.Click, "Click where the text goes, then type.");
     private static readonly EditorTool StampTool = new("stamp", "Place company stamp", SymbolRegular.Building24, PointerAction.Click, "Click where the company stamp goes.");
     private static readonly EditorTool DigitalBoxTool = new("digital", "Digital signature box", SymbolRegular.Certificate24, PointerAction.DrawRect,
-        "Drag a box where the visible digital signature should appear. Without a box the digital signature is invisible.");
+        "Drag a box where the signature should show. Without one it is invisible.");
 
     public override IReadOnlyList<EditorTool> Tools { get; } = [SelectTool, SignatureTool, InitialsTool, NameTool, DateTool, TextTool, StampTool, DigitalBoxTool];
 

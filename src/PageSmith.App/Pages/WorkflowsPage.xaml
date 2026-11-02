@@ -15,7 +15,7 @@
                 <TextBlock
                     Margin="0,4,0,0"
                     Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                    Text="Chain tools into reusable steps and run them on many files at once. (A Premium feature on iLovePDF.)"
+                    Text="Chain tools and run them on many files at once."
                     TextWrapping="Wrap" />
             </StackPanel>
             <ui:Button
