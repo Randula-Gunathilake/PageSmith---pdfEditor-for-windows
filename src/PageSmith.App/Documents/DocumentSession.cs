@@ -74,7 +74,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         var session = new DocumentSession(title, filePath);
         try
         {
-            session.AddVersion(pdf, "Opened", password);
+            await session.AddVersionAsync(pdf, "Opened", password);
             await session.LoadCurrentAsync();
             if (filePath != null) session._saved = session._current;
             return session;
@@ -95,7 +95,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
     }
 
     /// <summary>Copies a file into the working folder as the next version (dropping any undone versions).</summary>
-    private void AddVersion(string pdf, string description, string? password)
+    private async Task AddVersionAsync(string pdf, string description, string? password)
     {
         for (var i = _versions.Count - 1; i > _current; i--)
         {
@@ -105,18 +105,25 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         }
         // Each version keeps the document's own file name, so tools name their results after it.
         var folder = Path.Combine(WorkFolder, $"v{_versions.Count}");
-        Directory.CreateDirectory(folder);
         var copy = Path.Combine(folder, Title.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? Title : Title + ".pdf");
-        File.Copy(pdf, copy, overwrite: true);
+        // Large files take a while to copy: not on the UI thread.
+        await Task.Run(() =>
+        {
+            Directory.CreateDirectory(folder);
+            File.Copy(pdf, copy, overwrite: true);
+        });
         _versions.Add(new Version(copy, description, password));
         _current = _versions.Count - 1;
     }
 
     private async Task LoadCurrentAsync()
     {
-        var renderer = await PdfRenderer.OpenAsync(CurrentPath, Password);
-        var sizes = new Size[renderer.PageCount];
-        for (var i = 0; i < sizes.Length; i++) sizes[i] = renderer.GetPageSize(i);
+        var (path, password) = (CurrentPath, Password);
+        var (renderer, sizes) = await Task.Run(async () =>
+        {
+            var r = await PdfRenderer.OpenAsync(path, password).ConfigureAwait(false);
+            return (r, r.GetPageSizes());
+        });
         var old = Renderer;
         Renderer = renderer;
         PageSizes = sizes;
@@ -148,6 +155,9 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         });
     }
 
+    /// <summary>The current version's text if it has been read already; doesn't start reading it.</summary>
+    public TextIndex? LoadedText => _text is { IsCompletedSuccessfully: true } t ? t.Result : null;
+
     private void DropText()
     {
         var old = _text;
@@ -175,8 +185,9 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
     public async Task<bool> CommitAsync(string pdf, string description, Func<bool, Task<string?>> askPassword, string? newPassword = null)
     {
         var previous = _current;
-        var password = DocumentProperties.HasEncryptEntry(pdf) ? (string.IsNullOrEmpty(newPassword) ? Password : newPassword) : null;
-        AddVersion(pdf, description, password);
+        var encrypted = await Task.Run(() => DocumentProperties.HasEncryptEntry(pdf));
+        var password = encrypted ? (string.IsNullOrEmpty(newPassword) ? Password : newPassword) : null;
+        await AddVersionAsync(pdf, description, password);
         var wrong = false;
         while (true)
         {

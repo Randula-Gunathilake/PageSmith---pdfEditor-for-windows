@@ -350,8 +350,8 @@ public partial class DocumentView : UserControl
                 var version = _version;
                 try
                 {
-                    var png = await renderer.RenderThumbnailPngAsync(t.Index, 264);
-                    var image = await Task.Run(() => ImageIO.Decode(png));
+                    // Rendered and decoded off the UI thread, sized for the 132-point thumbnail on a high-DPI screen.
+                    var image = await renderer.RenderThumbnailAsync(t.Index, 240);
                     if (version == _version)
                     {
                         t.Image = image;
@@ -380,7 +380,7 @@ public partial class DocumentView : UserControl
     /// </summary>
     private void ForgetOldThumbnails(PageThumbnail loaded)
     {
-        const int Keep = 150;
+        const int Keep = 120;
         _loadedThumbs.Enqueue(loaded);
         for (var checks = _loadedThumbs.Count; _loadedThumbs.Count > Keep && checks > 0; checks--)
         {

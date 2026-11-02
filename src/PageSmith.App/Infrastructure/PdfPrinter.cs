@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using PageSmith.App.Documents;
 using PageSmith.Core.Rendering;
 using Wpf.Ui.Controls;
@@ -35,18 +36,25 @@ public static class PdfPrinter
             _ => Enumerable.Range(0, count).ToList(),
         };
         var paper = new Size(dialog.PrintableAreaWidth, dialog.PrintableAreaHeight);
-        AppServices.Notify("Printing", $"Sending {pages.Count} page{(pages.Count == 1 ? "" : "s")} of \"{session.Title}\" to {dialog.PrintQueue.Name}.", ControlAppearance.Secondary, SymbolRegular.Print24);
-        // Let the notification draw before the pages are prepared.
-        await Task.Delay(50);
+        AppServices.Notify("Printing", $"{pages.Count} page{(pages.Count == 1 ? "" : "s")} to {dialog.PrintQueue.Name}", ControlAppearance.Secondary, SymbolRegular.Print24);
         try
         {
-            dialog.PrintDocument(new Paginator(renderer, session.PageSizes, pages, paper), session.Title);
+            // Written asynchronously: the window keeps responding between pages, which render ahead in the background.
+            var writer = PrintQueue.CreateXpsDocumentWriter(dialog.PrintQueue);
+            var done = new TaskCompletionSource();
+            writer.WritingCompleted += (_, e) =>
+            {
+                if (e.Error != null) done.TrySetException(e.Error);
+                else done.TrySetResult();
+            };
+            writer.WriteAsync(new Paginator(renderer, session.PageSizes, pages, paper), dialog.PrintTicket);
+            await done.Task;
         }
         catch (PrintingCanceledException)
         {
             // Cancelled from the printer's own dialog.
         }
-        catch (Exception ex) when (ex is PrintQueueException or PrintSystemException or InvalidOperationException)
+        catch (Exception ex) when (ex is PrintQueueException or PrintSystemException or InvalidOperationException or ObjectDisposedException)
         {
             AppServices.LogError(ex);
             AppServices.Notify("Couldn't print", ex.Message, ControlAppearance.Danger, SymbolRegular.ErrorCircle24);
@@ -55,22 +63,40 @@ public static class PdfPrinter
 
     /// <summary>
     /// One page per sheet, turned to match the paper's orientation, shrunk to fit inside a small margin
-    /// (pages are never enlarged), and centred.
+    /// (pages are never enlarged), and centred. The next pages are rendered while one is being sent.
     /// </summary>
     private sealed class Paginator(PdfRenderer renderer, IReadOnlyList<Size> sizes, IReadOnlyList<int> pages, Size paper) : DocumentPaginator
     {
         private const double Margin = 18;
+        private const int Ahead = 2;
+        private readonly Dictionary<int, Task<BitmapSource>> _renders = [];
 
         public override bool IsPageCountValid => true;
         public override int PageCount => pages.Count;
         public override Size PageSize { get; set; } = paper;
         public override IDocumentPaginatorSource? Source => null;
 
+        private Task<BitmapSource> Render(int pageNumber)
+        {
+            if (!_renders.TryGetValue(pageNumber, out var task))
+            {
+                var index = pages[pageNumber];
+                var size = sizes[index];
+                var dpi = Math.Min(300, 5000 * 72 / Math.Max(size.Width, size.Height));
+                task = Task.Run(() => renderer.RenderAsync(index, dpi));
+                _renders[pageNumber] = task;
+            }
+            return task;
+        }
+
         public override DocumentPage GetPage(int pageNumber)
         {
-            var index = pages[pageNumber];
-            var size = sizes[index];
+            for (var n = pageNumber; n <= Math.Min(pageNumber + Ahead, pages.Count - 1); n++) Render(n);
+            var bitmap = Render(pageNumber).GetAwaiter().GetResult();
+            _renders.Remove(pageNumber);
+
             var paper = PageSize;
+            var size = sizes[pages[pageNumber]];
             var turn = size.Width > size.Height != paper.Width > paper.Height;
             // The page's footprint on the paper, in DIPs.
             var width = (turn ? size.Height : size.Width) * 96 / 72;
@@ -79,10 +105,6 @@ public static class PdfPrinter
             width *= scale;
             height *= scale;
             var center = new Point(paper.Width / 2, paper.Height / 2);
-
-            var dpi = Math.Min(300, 6000 * 72 / Math.Max(size.Width, size.Height));
-            // Printing calls this on the UI thread; the renderer itself works on the thread pool.
-            var bitmap = Task.Run(() => renderer.RenderAsync(index, dpi)).GetAwaiter().GetResult();
 
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())

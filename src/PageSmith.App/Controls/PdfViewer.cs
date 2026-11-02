@@ -48,8 +48,11 @@ public sealed class PdfViewer : UserControl
     public const double MinZoom = 0.1, MaxZoom = 8;
     private static readonly double[] ZoomSteps = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8];
 
-    /// <summary>Rendered pages kept for scrolling back, per tab.</summary>
-    private const long CacheBudget = 160L * 1024 * 1024;
+    /// <summary>Rendered pages kept for scrolling back, per tab (about seven A4 pages at 125 %).</summary>
+    private const long CacheBudget = 64L * 1024 * 1024;
+
+    /// <summary>Pages already on screen are re-rendered only once zooming has paused this long.</summary>
+    private static readonly TimeSpan ZoomSettle = TimeSpan.FromMilliseconds(250);
 
     private static readonly Brush SelectionBrush = Frozen(Color.FromArgb(0x55, 0x2F, 0x80, 0xED));
     private static readonly Brush HitBrush = Frozen(Color.FromArgb(0x66, 0xFF, 0xD4, 0x00));
@@ -60,6 +63,7 @@ public sealed class PdfViewer : UserControl
     private readonly Dictionary<int, PageView> _views = [];
     private readonly Dictionary<int, CachedPage> _cache = [];
     private readonly DispatcherTimer _renderTimer = new() { Interval = TimeSpan.FromMilliseconds(60) };
+    private readonly DispatcherTimer _settleTimer = new() { Interval = TimeSpan.FromMilliseconds(280) };
     private readonly DispatcherTimer _autoScroll = new() { Interval = TimeSpan.FromMilliseconds(40) };
     private readonly DispatcherTimer _spotTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
     private (int Page, Rect Box)? _spot;
@@ -146,6 +150,11 @@ public sealed class PdfViewer : UserControl
         {
             _renderTimer.Stop();
             Pump();
+        };
+        _settleTimer.Tick += (_, _) =>
+        {
+            _settleTimer.Stop();
+            UpdateVisible();
         };
         _autoScroll.Tick += OnAutoScroll;
         _scroll.PreviewMouseWheel += OnWheel;
@@ -245,8 +254,11 @@ public sealed class PdfViewer : UserControl
         _scroll.ScrollToVerticalOffset(_pendingY.Value);
     }
 
-    /// <summary>The current version's text, once it has been read (see <see cref="DocumentSession.GetTextAsync"/>).</summary>
-    private TextIndex? Text => _session?.GetTextAsync() is { IsCompletedSuccessfully: true } t ? t.Result : null;
+    /// <summary>
+    /// The current version's text, once it has been read. Reading starts when the pointer first moves over
+    /// the pages or a search begins, so just reading a document doesn't load its text.
+    /// </summary>
+    private TextIndex? Text => _session?.LoadedText;
 
     private Size PageSize(int index) => _session!.PageSizes[index];
 
@@ -284,7 +296,6 @@ public sealed class PdfViewer : UserControl
         _scroll.UpdateLayout();
         if (anchor is { } a) RestoreAnchor(a);
         else ScrollToY(0);
-        _ = _session?.GetTextAsync();
         UpdateVisible();
         if (hadSelection) SelectionChanged?.Invoke(this, EventArgs.Empty);
         ZoomChanged?.Invoke(this, EventArgs.Empty);
@@ -408,13 +419,22 @@ public sealed class PdfViewer : UserControl
         return Math.Max(dpi, 8);
     }
 
+    /// <summary>
+    /// Whether a page needs (re-)rendering. A page with an image is redrawn only when zooming has paused,
+    /// and only to get sharper, or when its image is far bigger than needed (memory); a slightly sharper
+    /// image than needed looks the same and saves the work.
+    /// </summary>
     private bool NeedsRender(PageView v)
     {
         if (v.Failed) return false;
         if (v.Dpi <= 0) return true;
+        if (DateTime.UtcNow - _zoomedAt < ZoomSettle) return false;
         var target = TargetDpi(v.Index);
-        return Math.Abs(v.Dpi - target) / target > 0.12;
+        return v.Dpi < target * 0.88 || v.Dpi > target * 2;
     }
+
+    /// <summary>When the zoom last changed; renders of pages already shown wait until it settles.</summary>
+    private DateTime _zoomedAt;
 
     private PageView? NextToRender()
     {
@@ -557,6 +577,10 @@ public sealed class PdfViewer : UserControl
         var py = (cy - _tops[page]) / oldScale;
         var px = (cx - PageLeft(page, oldScale)) / oldScale;
         _zoom = zoom;
+        // Pages on screen stretch their current image while zooming and are redrawn once it pauses.
+        _zoomedAt = DateTime.UtcNow;
+        _settleTimer.Stop();
+        _settleTimer.Start();
         Relayout();
         _scroll.UpdateLayout();
         var scale = Scale;
@@ -617,18 +641,20 @@ public sealed class PdfViewer : UserControl
         SelectionUpdated();
     }
 
-    public void SelectAll()
+    public async void SelectAll()
     {
-        if (_tops.Length == 0) return;
+        if (_tops.Length == 0 || _session == null) return;
         _anchor = new TextPosition(0, 0);
         _focus = new TextPosition(_tops.Length - 1, int.MaxValue);
         SelectionUpdated();
+        // The text may not have been read yet: show the selection once it has.
+        if (Text == null && await _session.GetTextAsync() != null && _anchor != null) SelectionUpdated();
     }
 
     /// <summary>The selected text (read in the background, since a whole document can be selected).</summary>
     public async Task<string> GetSelectedTextAsync()
     {
-        if (_anchor is not { } a || _focus is not { } f || Text is not { } text) return "";
+        if (_anchor is not { } a || _focus is not { } f || _session == null || await _session.GetTextAsync() is not { } text) return "";
         try
         {
             return await Task.Run(() => text.TextBetween(a, f));
@@ -799,6 +825,9 @@ public sealed class PdfViewer : UserControl
         EndDrag();
     }
 
+    /// <summary>Development aid for --stress: scrolls like a touchpad does.</summary>
+    internal void ScrollBy(double dy) => ScrollToY(OffsetY + dy);
+
     /// <summary>Development aid for --snapshot: a drag between two viewer points, through the same steps as the mouse.</summary>
     internal void SimulateDrag(Point from, Point to)
     {
@@ -850,6 +879,8 @@ public sealed class PdfViewer : UserControl
                 else if (!outside) _autoScroll.Stop();
                 break;
             case Drag.None when Tool == ViewerTool.Select:
+                // The pointer over the pages: text may be selected soon, so start reading it.
+                if (Text == null) _ = _session?.GetTextAsync();
                 UpdateCursor(pos);
                 break;
         }
@@ -1052,16 +1083,18 @@ public sealed class PdfViewer : UserControl
     /// <summary>One page: white paper with a soft shadow, the rendered image and the highlight layer.</summary>
     private sealed class PageView : Grid
     {
-        private static readonly Effect Shadow = CreateShadow();
+        /// <summary>A thin edge rather than a drop shadow: shadow effects are redrawn on every scroll.</summary>
+        private static readonly Brush Edge = Frozen(Color.FromArgb(0x30, 0, 0, 0));
+
         private readonly Image _image = new() { Stretch = Stretch.Fill };
 
         public PageView(int index)
         {
             Index = index;
             Background = Brushes.White;
-            Effect = Shadow;
             RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.HighQuality);
             Children.Add(_image);
+            Children.Add(new Border { BorderBrush = Edge, BorderThickness = new Thickness(1), IsHitTestVisible = false });
             Overlay = new Canvas
             {
                 IsHitTestVisible = false,
@@ -1094,13 +1127,6 @@ public sealed class PdfViewer : UserControl
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
             });
-        }
-
-        private static Effect CreateShadow()
-        {
-            var shadow = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 1, Opacity = 0.22, Direction = 270, Color = Colors.Black };
-            shadow.Freeze();
-            return shadow;
         }
     }
 }

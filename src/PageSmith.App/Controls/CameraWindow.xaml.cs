@@ -29,6 +29,8 @@ public partial class CameraWindow : FluentWindow
     public CameraWindow()
     {
         InitializeComponent();
+        // A hidden spinning ring still redraws the window; spin only while shown.
+        Starting.IsVisibleChanged += (_, _) => Starting.IsIndeterminate = Starting.IsVisible;
         Loaded += async (_, _) => await LoadCamerasAsync();
         Closed += async (_, _) => await StopAsync();
     }
