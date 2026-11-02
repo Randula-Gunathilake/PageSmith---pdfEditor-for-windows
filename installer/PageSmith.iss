@@ -107,6 +107,10 @@ Root: HKA; Subkey: "Software\PageSmith\Capabilities"; ValueType: string; ValueNa
 Root: HKA; Subkey: "Software\PageSmith\Capabilities"; ValueType: string; ValueName: "ApplicationIcon"; ValueData: """{app}\{#AppExe}"",0"; Tasks: openwith
 Root: HKA; Subkey: "Software\PageSmith\Capabilities\FileAssociations"; ValueType: string; ValueName: ".pdf"; ValueData: "{#ProgId}"; Tasks: openwith
 Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "PageSmith"; ValueData: "Software\PageSmith\Capabilities"; Flags: uninsdeletevalue; Tasks: openwith
+; "Open with PageSmith" when a PDF is right-clicked (on Windows 11, under "Show more options").
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PageSmith"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Open with PageSmith"; Flags: uninsdeletekey; Tasks: openwith
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PageSmith"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\{#AppExe}"",0"; Tasks: openwith
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PageSmith\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""; Tasks: openwith
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,PageSmith}"; Flags: nowait postinstall skipifsilent
@@ -126,6 +130,7 @@ begin
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\PageSmith\Capabilities');
   RegDeleteKeyIfEmpty(HKCU, 'Software\PageSmith');
   RegDeleteValue(HKCU, 'Software\RegisteredApplications', 'PageSmith');
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\SystemFileAssociations\.pdf\shell\PageSmith');
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
