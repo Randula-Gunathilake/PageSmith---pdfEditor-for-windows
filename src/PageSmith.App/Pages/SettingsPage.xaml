@@ -129,7 +129,7 @@
                 <ui:CardControl.Header>
                     <StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="Use Microsoft Word for PDF to Word" />
-                        <TextBlock Style="{StaticResource OptionHint}" Text="Word's reflow can be closer for complex layouts but is slower; PageSmith falls back to its own converter if Word stalls." />
+                        <TextBlock Style="{StaticResource OptionHint}" Text="Word can match complex layouts better but is slower. PageSmith uses its own converter if Word stalls." />
                     </StackPanel>
                 </ui:CardControl.Header>
                 <ui:ToggleSwitch IsChecked="{Binding UseWordForPdfToWord}" />
@@ -181,7 +181,7 @@
                         <ComboBoxItem Content="Gemini by Google (API key below)" Tag="Gemini" />
                         <ComboBoxItem Content="OpenAI (API key below)" Tag="OpenAI" />
                     </ComboBox>
-                    <TextBlock Style="{StaticResource OptionHeader}" Text="MyMemory email (optional, raises the daily limit to 50,000 characters)" />
+                    <TextBlock Style="{StaticResource OptionHeader}" Text="MyMemory email (optional, raises the daily limit)" />
                     <ui:TextBox
                         MaxWidth="360"
                         HorizontalAlignment="Left"

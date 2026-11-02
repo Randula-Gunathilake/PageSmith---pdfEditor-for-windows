@@ -14,9 +14,9 @@ namespace PageSmith.App.Tools;
 public sealed partial class FormsController() : EditorController("forms")
 {
     private static readonly EditorTool FillTool = new("fill", "Fill in the form", SymbolRegular.Form24, PointerAction.Interact,
-        "Click a highlighted field on the page and type. Tick boxes and pick options the same way.");
+        "Click a highlighted field and type.");
     private static readonly EditorTool SelectTool = new("select", "Select fields", SymbolRegular.Cursor24, PointerAction.Select,
-        "Click a new field to rename it or change its options; drag to move it, use the handles to resize.");
+        "Click a field to edit it, drag to move, use the handles to resize.");
     private static readonly EditorTool TextFieldTool = new("text", "Text field", SymbolRegular.TextField24, PointerAction.DrawRect, "Drag on the page to draw a text field.");
     private static readonly EditorTool MultilineTool = new("multiline", "Multi-line text field", SymbolRegular.Textbox24, PointerAction.DrawRect, "Drag on the page to draw a box for several lines of text.");
     private static readonly EditorTool CheckboxTool = new("checkbox", "Checkbox", SymbolRegular.CheckboxChecked24, PointerAction.DrawRect, "Click or drag on the page to add a checkbox.");
@@ -83,7 +83,7 @@ public sealed partial class FormsController() : EditorController("forms")
         var added = fields.Count(f => !f.IsExisting);
         Summary = (existing, added) switch
         {
-            (0, 0) => "This PDF has no form fields yet. Draw some with the field tools above the page, or let PageSmith detect them.",
+            (0, 0) => "No form fields yet. Draw some with the field tools, or detect them.",
             (0, _) => $"{added} new field{(added == 1 ? "" : "s")} will be added.",
             _ => $"{existing} field{(existing == 1 ? "" : "s")} in this form · {changed} changed" + (added > 0 ? $" · {added} new" : ""),
         };

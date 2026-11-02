@@ -54,7 +54,7 @@ public partial class CameraWindow : FluentWindow
             var cameras = groups.Where(g => g.SourceInfos.Any(s => s.SourceKind == MediaFrameSourceKind.Color)).ToList();
             if (cameras.Count == 0)
             {
-                ShowMessage("No camera was found. Connect a webcam, or use your phone's camera and add the photos instead.");
+                ShowMessage("No camera found. Connect a webcam, or add photos instead.");
                 return;
             }
             Cameras.ItemsSource = cameras;
@@ -119,7 +119,7 @@ public partial class CameraWindow : FluentWindow
         }
         catch (UnauthorizedAccessException)
         {
-            ShowMessage("Windows is blocking camera access for desktop apps. Turn on \"Let desktop apps access your camera\" in privacy settings, then reopen this window.", privacy: true);
+            ShowMessage("Windows is blocking the camera. Turn on \"Let desktop apps access your camera\" in privacy settings, then reopen this window.", privacy: true);
         }
         catch (Exception ex)
         {

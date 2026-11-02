@@ -15,7 +15,7 @@
                 Margin="0,6,0,0"
                 FontTypography="Body"
                 Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                Text="Merge, split, compress, convert, edit, sign and protect PDFs on your PC — free, without limits, and offline."
+                Text="Merge, split, compress, convert, edit, sign and protect PDFs. Free, unlimited and offline."
                 TextWrapping="Wrap" />
 
             <!--  Open a document, recent documents  -->
@@ -36,7 +36,7 @@
                         <TextBlock
                             Margin="0,4,0,0"
                             Style="{StaticResource OptionHint}"
-                            Text="PDFs open in tabs, like in a browser, to read, search, print and change with any tool. Images, Office files and web pages open as new PDFs." />
+                            Text="Open PDFs in tabs to read, search, print and edit. Images, Office files and web pages open as PDFs." />
                         <ui:Button
                             Margin="0,10,0,0"
                             Appearance="Primary"

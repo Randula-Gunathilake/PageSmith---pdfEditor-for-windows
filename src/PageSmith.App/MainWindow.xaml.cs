@@ -172,6 +172,7 @@ public partial class MainWindow : FluentWindow
             return;
         }
         AppServices.Settings.Window = WindowSizing.Capture(this);
+        foreach (var view in _views.Values) view.RememberPlace();
         AppServices.SaveSettings();
     }
 

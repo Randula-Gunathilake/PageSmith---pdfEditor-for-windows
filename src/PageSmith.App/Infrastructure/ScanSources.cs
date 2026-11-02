@@ -40,7 +40,7 @@ public static class ScanSources
     public static string? ScanPage()
     {
         var type = Type.GetTypeFromProgID("WIA.CommonDialog")
-            ?? throw new UserFacingException("Windows Image Acquisition isn't available on this PC, so scanners can't be used. You can still take photos or add images.");
+            ?? throw new UserFacingException("Scanners can't be used on this PC. You can still take photos or add images.");
         dynamic? dialog = null;
         dynamic? image = null;
         try
@@ -56,7 +56,7 @@ public static class ScanSources
         {
             throw new UserFacingException(ex.HResult switch
             {
-                NoDeviceAvailable => "No scanner was found. Connect and switch on your scanner (or install its driver), then try again.",
+                NoDeviceAvailable => "No scanner found. Connect and switch it on (or install its driver), then try again.",
                 DeviceBusy => "The scanner is busy. Wait until it finishes, then try again.",
                 PaperEmpty => "The document feeder is empty. Load the pages and try again.",
                 PaperJam => "The scanner reports a paper jam.",

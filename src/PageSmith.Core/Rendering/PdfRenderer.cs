@@ -188,7 +188,53 @@ public sealed class PdfRenderer : IDisposable
     public async Task<BitmapSource> RenderAsync(int index, double dpi, CancellationToken ct = default)
     {
         var bmp = await RenderBytesAsync(index, dpi, true, WinBitmapEncoder.BmpEncoderId, ct).ConfigureAwait(false);
-        return Imaging.ImageIO.Decode(bmp);
+        return FromBmp(bmp) ?? Imaging.ImageIO.Decode(bmp);
+    }
+
+    /// <summary>
+    /// Makes a frozen bitmap straight from a 32-bit BMP's pixels, without the image decoder's extra copies
+    /// (it took most of the time of drawing a page). Pages are drawn on white, so alpha is left out: Bgr32 is
+    /// also the quickest format for WPF to draw. Null for any other kind of BMP.
+    /// </summary>
+    internal static BitmapSource? FromBmp(byte[] bmp)
+    {
+        if (bmp.Length < 66 || bmp[0] != 'B' || bmp[1] != 'M') return null;
+        var offset = BitConverter.ToInt32(bmp, 10);
+        var width = BitConverter.ToInt32(bmp, 18);
+        var height = BitConverter.ToInt32(bmp, 22);
+        var bits = BitConverter.ToInt16(bmp, 28);
+        var compression = BitConverter.ToInt32(bmp, 30);
+        // Uncompressed, or with colour masks that must be the usual blue-green-red order.
+        var plainMasks = compression == 0 ||
+                         compression == 3 && BitConverter.ToUInt32(bmp, 54) == 0x00FF0000 && BitConverter.ToUInt32(bmp, 58) == 0x0000FF00 && BitConverter.ToUInt32(bmp, 62) == 0x000000FF;
+        if (bits != 32 || !plainMasks || width <= 0 || height == 0) return null;
+        var rows = Math.Abs(height);
+        var stride = width * 4;
+        if (offset < 54 || offset + (long)stride * rows > bmp.Length) return null;
+        BitmapSource bitmap;
+        if (height < 0)
+        {
+            // Top-down rows can be used where they are.
+            var pinned = System.Runtime.InteropServices.GCHandle.Alloc(bmp, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                bitmap = BitmapSource.Create(width, rows, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null,
+                    pinned.AddrOfPinnedObject() + offset, stride * rows, stride);
+            }
+            finally
+            {
+                pinned.Free();
+            }
+        }
+        else
+        {
+            // Bottom-up rows are turned the right way up.
+            var pixels = new byte[stride * rows];
+            for (var y = 0; y < rows; y++) System.Buffer.BlockCopy(bmp, offset + (rows - 1 - y) * stride, pixels, y * stride, stride);
+            bitmap = BitmapSource.Create(width, rows, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null, pixels, stride);
+        }
+        bitmap.Freeze();
+        return bitmap;
     }
 
     /// <summary>
